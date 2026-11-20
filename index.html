@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B1F4A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Scheda cliente</title>
+<style>
+/* ===== TEMA: zaffiro profondo 60% · avorio perla 30% · arancio 10% ===== */
+:root{
+  --zaffiro-luce:#2A5CB0; --zaffiro-medio:#173C7E; --zaffiro:#0B1F4A; --zaffiro-notte:#06122D;
+  --avorio-luce:#FDF9EA; --avorio:#F5EEDA; --avorio-ombra:#E6DBB9; --avorio-testo:#F6EFD9;
+  --arancio:#FF5A12;
+  --indaco:#123A7A; --indaco-scuro:#0B1F4A; --indaco-chiaro:#DCE5F5;
+  --celadon:#123A7A; --celadon-chiaro:#DCE5F5;
+  --oro:#8A2C00; --oro-chiaro:#FFE4D6;
+  --vermilio:#A61E1E; --vermilio-chiaro:#FBE3E1;
+  --fondo:#0B1F4A; --carta:#F5EEDA; --bordo:#CFC29E; --bordo-soft:#DDD1B0;
+  --testo:#0A1B40; --testo-2:#1F3563; --testo-3:#4A5878; --placeholder:#7C879E;
+  --raggio:12px; --raggio-grande:16px;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fondo);color:var(--testo);font-family:var(--font);-webkit-text-size-adjust:100%}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:520px;margin:0 auto;padding:22px 20px 28px;display:flex;flex-direction:column;gap:14px;min-height:100vh}
+h1{margin:0;font-size:26px;line-height:1.15;color:var(--indaco-scuro)}
+h2{margin:0;font-size:16px;color:var(--indaco-scuro)}
+.top{display:flex;align-items:center;gap:6px}
+.top h1{font-size:24px}
+.back{width:44px;height:44px;margin-left:-10px;border:0;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.pill{align-self:flex-start;display:flex;align-items:center;gap:8px;background:var(--celadon-chiaro);color:var(--celadon);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--celadon);display:block}
+.sub{font-size:15px;color:var(--testo-3)}
+.nota{font-size:12px;color:var(--testo-3)}
+.riga{background:var(--carta);border:1px solid var(--bordo-soft);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;min-height:44px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.riga .t{flex:1;display:flex;flex-direction:column;gap:2px}
+.riga .t b{font-size:17px}
+.riga .t span{font-size:13px;color:var(--testo-3)}
+.chip{font-size:12px;font-weight:700;border-radius:999px;padding:5px 10px;white-space:nowrap}
+.ok{background:var(--celadon-chiaro);color:var(--celadon)}
+.wip{background:var(--oro-chiaro);color:var(--oro)}
+.todo{background:var(--indaco-chiaro);color:var(--indaco)}
+.card{background:var(--carta);border:2px solid var(--indaco);border-radius:var(--raggio-grande);padding:14px;display:flex;flex-direction:column;gap:11px}
+.campo{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.campo .rig{display:flex;justify-content:space-between;align-items:baseline}
+label,.lbl{font-size:13px;font-weight:600;color:var(--testo-2)}
+.tag{font-size:11px;font-weight:700;color:var(--testo-3)}
+.tag.err{color:var(--vermilio)}
+input,textarea{width:100%;min-height:44px;border:1px solid var(--bordo);border-radius:var(--raggio);background:var(--carta);padding:0 14px;font:inherit;font-size:16px;color:var(--testo)}
+.card input,.card textarea{background:var(--fondo)}
+textarea{padding:10px 14px;min-height:72px;resize:vertical}
+input::placeholder,textarea::placeholder{color:var(--placeholder)}
+input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--oro);outline-offset:1px}
+input.err{border-color:var(--vermilio)}
+.cols{display:flex;gap:10px}
+.griglia{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.scelte{display:flex;flex-wrap:wrap;gap:6px}
+.scelta{min-height:44px;border-radius:var(--raggio);padding:0 12px;font:inherit;font-size:14px;font-weight:600;background:var(--carta);color:var(--testo-2);border:1px solid var(--bordo);cursor:pointer}
+.scelta.on{background:var(--indaco);color:#fff;border-color:var(--indaco)}
+.scelte.pill-s .scelta{min-height:38px;border-radius:999px;font-size:13px}
+.btn{display:flex;align-items:center;justify-content:center;min-height:52px;border-radius:14px;background:var(--indaco);color:#fff;font:inherit;font-size:17px;font-weight:700;border:0;cursor:pointer;width:100%;text-align:center}
+.btn.sec{background:var(--carta);color:var(--indaco);border:1px solid var(--bordo)}
+.btn.peric{background:var(--carta);color:var(--vermilio);border:2px solid var(--vermilio);min-height:46px;font-size:15px}
+.btn:disabled{opacity:.5}
+.avviso{font-size:12px;border-radius:10px;padding:8px 10px}
+.avviso.oro{background:var(--oro-chiaro);color:var(--oro)}
+.avviso.err{background:var(--vermilio-chiaro);color:var(--vermilio)}
+.sw{display:flex;align-items:center;gap:12px;background:var(--carta);border:1px solid var(--bordo-soft);border-radius:14px;padding:12px 14px;min-height:52px;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.sw .t{flex:1;font-size:15px;font-weight:600}
+.sw .b{width:46px;height:28px;border-radius:999px;background:var(--bordo);position:relative;flex:none}
+.sw .b:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s}
+.sw[aria-checked=true] .b{background:var(--indaco)}
+.sw[aria-checked=true] .b:after{left:21px}
+.ctl{background:var(--carta);border:1px solid var(--bordo-soft);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.ctl div{display:flex;align-items:flex-start;gap:8px;font-size:14px}
+.ctl i{width:10px;height:10px;border-radius:50%;display:block;flex:none;margin-top:5px}
+.file{background:var(--carta);border:1px solid var(--bordo-soft);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.file .s{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none}
+.file .n{font-size:14px;font-weight:600;word-break:break-all}
+.dopo{display:flex;flex-direction:column;gap:6px;background:var(--vermilio-chiaro);border-radius:14px;padding:12px 14px}
+.dopo b{font-size:14px;color:var(--vermilio)}
+.dopo p{margin:0;font-size:13px;color:#4A2A24}
+.spazio{flex:1}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--indaco-scuro);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;max-width:90vw;display:none;z-index:9}
+img.logo{max-height:64px;max-width:160px;border-radius:8px;border:1px solid var(--bordo-soft);background:#fff}
+</style>
+
+<style>
+/* ===== Regole del tema ===== */
+html{background:var(--zaffiro-notte)}
+body{background:transparent;color:var(--testo)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 85% 60% at 50% 38%,var(--zaffiro-luce) 0%,var(--zaffiro-medio) 38%,var(--zaffiro) 72%,var(--zaffiro-notte) 100%)}
+h1,.top h1{color:var(--avorio-testo)}
+.sub{color:rgba(246,239,217,.8)}
+.back svg{stroke:var(--avorio-testo)}
+.pill{background:rgba(246,239,217,.12);color:var(--avorio-testo)}.pill i{background:#FF5A12}
+.riga,.card,.ctl,.file,.sw,.dopo{background:radial-gradient(ellipse 100% 120% at 50% 35%,var(--avorio-luce) 0%,var(--avorio) 55%,var(--avorio-ombra) 100%);border:1px solid rgba(255,252,238,.55);box-shadow:0 8px 20px rgba(3,10,30,.38)}
+.nota{color:rgba(246,239,217,.78)}
+.card .nota,.ctl .nota,.file .nota,.riga .nota,.dopo .nota,.sw .nota{color:#4A5878}
+.lbl{color:var(--avorio-testo)}.card .lbl,.sw .lbl{color:var(--testo-2)}
+.todo{background:#EBE2C7;color:#4A5878}
+.btn{background:var(--arancio);color:var(--testo);box-shadow:0 8px 18px rgba(255,90,18,.35)}
+.btn.sec{background:transparent;color:var(--avorio-testo);border:1px solid rgba(246,239,217,.55);box-shadow:none}
+.card .btn.sec{color:#123A7A;border-color:#CFC29E}
+.btn.peric{background:#FDF9EA;color:#A61E1E;border:2px solid #A61E1E;box-shadow:none}
+.card input,.card textarea{background:rgba(11,31,74,.05)}
+input:focus,textarea:focus,button:focus-visible{outline:3px solid #FF5A12}
+.sw[aria-checked=true] .b{background:#FF5A12}
+.dopo b{color:#A61E1E}.dopo p{color:#1F3563}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status"></div>
+<script src="jspdf.umd.min.js"></script>
+<script>
+'use strict';
+/* ================= Stato ================= */
+const KEY='scheda_cliente_v1';
+const SCHEMA='wiseman-scheda-cliente';
+const VERSIONE=1;
+const oggi=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+const vuota=()=>({
+  struttura:{ragione_sociale:'',partita_iva:'',indirizzo:'',cap:'',comune:'',provincia:'',telefono:'',email:'',pec:'',profilo:'',data_documenti:oggi()},
+  dpo:{presente:false,tipo:'esterno',natura:'giuridica',nome_denominazione:'',codice_fiscale:'',partita_iva:'',sede:'',telefono:'',email:''},
+  soggetti:[],personale:[],
+  opzioni:{smartphone_tablet:false,chiavette_internet:false,accordo_sindacati:false,videosorveglianza:false},
+  opzioni_confermate:false,
+  logo:null
+});
+let S;
+try{S=Object.assign(vuota(),JSON.parse(localStorage.getItem(KEY)||'null')||{});}catch(e){S=vuota();}
+let VIEW='home';
+let D={};            // bozza (soggetto/persona in modifica), solo in memoria
+let IDX=null;        // indice in modifica
+const salva=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Memoria piena: esporta e svuota');}};
+
+/* ================= Costanti ================= */
+const PROFILI=[['odontoiatria','Odontoiatria'],['poliambulatorio','Poliambulatorio'],['fisioterapia','Fisioterapia'],['ottica','Ottica']];
+const RUOLI=[['referente_privacy','Referente privacy'],['amministratore_sistema','Amministratore di sistema'],['autorizzato','Autorizzato'],['manutentore','Manutentore'],['pulizie','Pulizie'],['responsabile','Responsabile']];
+const RUOLO_L=Object.fromEntries(RUOLI);
+const OPZIONI=[['smartphone_tablet','Smartphone e tablet aziendali'],['chiavette_internet','Chiavette internet'],['accordo_sindacati','Accordo con i sindacati'],['videosorveglianza','Videosorveglianza']];
+const MANSIONI=['Odontoiatra','Igienista dentale','Assistente alla poltrona','Segreteria','Medico','Fisioterapista','Infermiere','Ottico','Optometrista','Amministrazione'];
+const SEZIONI_ACCESSO=['amministratore_sistema','manutentore'];
+
+/* ================= Utilità ================= */
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const t=s=>String(s??'').trim();
+const emailOk=s=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
+const pivaOk=s=>/^\d{11}$/.test(s.replace(/\s/g,''));
+const cfOk=s=>/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i.test(s)||/^\d{11}$/.test(s);
+const slug=s=>t(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'cliente';
+function ref(path){const p=path.split('.');let o=S;if(p[0]==='d'){o=D;p.shift();}for(let i=0;i<p.length-1;i++)o=o[p[i]];return [o,p[p.length-1]];}
+const get=path=>{const [o,k]=ref(path);return o[k];};
+const set=(path,v)=>{const [o,k]=ref(path);o[k]=v;};
+let toastT;function toast(m){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>e.style.display='none',3200);}
+
+/* ================= Componenti ================= */
+const icoBack='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3A3F8C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+const testa=(titolo,extra='')=>`<div class="top"><button class="back" data-act="vai" data-v="home" aria-label="Indietro">${icoBack}</button><h1>${titolo}</h1>${extra}</div>`;
+function campo(lbl,path,o={}){
+  const id='f_'+path.replace(/\W/g,'_');
+  const v=get(path)??'';
+  const err=o.err?' err':'';
+  const inp=o.area
+    ?`<textarea id="${id}" data-k="${path}" placeholder="${esc(o.ph||'')}">${esc(v)}</textarea>`
+    :`<input id="${id}" class="${err}" data-k="${path}" type="${o.type||'text'}" value="${esc(v)}" placeholder="${esc(o.ph||'')}" ${o.im?`inputmode="${o.im}"`:''} ${o.list?`list="${o.list}"`:''} ${o.up?'autocapitalize="characters"':''} autocomplete="off" spellcheck="false">`;
+  return `<div class="campo" ${o.stile?`style="${o.stile}"`:''}><div class="rig"><label for="${id}">${lbl}</label>${o.tag?`<span class="tag ${o.tagErr?'err':''}">${o.tag}</span>`:''}</div>${inp}</div>`;
+}
+const scelta=(path,opts,cls='')=>`<div class="scelte ${cls}" role="group">${opts.map(([v,l])=>`<button type="button" class="scelta ${get(path)===v?'on':''}" aria-pressed="${get(path)===v}" data-act="set" data-k="${path}" data-v="${v}">${l}</button>`).join('')}</div>`;
+const interr=(lbl,path)=>`<button type="button" class="sw" role="switch" aria-checked="${!!get(path)}" data-act="toggle" data-k="${path}"><span class="t">${lbl}</span><span class="b"></span></button>`;
+
+/* ================= Controlli ================= */
+function controlli(){
+  const s=S.struttura,c=[];
+  c.push(t(s.ragione_sociale)?[1,'Ragione sociale presente']:[0,'Ragione sociale mancante']);
+  c.push(emailOk(t(s.pec))?[1,'PEC presente']:[0,'PEC mancante o non valida (obbligatoria per la procedura di data breach)']);
+  c.push(s.profilo?[1,'Profilo: '+(PROFILI.find(p=>p[0]===s.profilo)||[0,''])[1]]:[0,'Profilo non scelto']);
+  if(t(s.partita_iva)&&!pivaOk(s.partita_iva))c.push([0,'Partita IVA: servono 11 cifre']);
+  if(S.dpo.presente)c.push(t(S.dpo.nome_denominazione)?[1,'DPO '+S.dpo.tipo+': '+t(S.dpo.nome_denominazione)]:[0,'DPO nominato ma senza nominativo']);
+  else c.push([1,'DPO non nominato (nessun riferimento nei documenti)']);
+  c.push([1,`Soggetti: ${S.soggetti.length} inseriti`]);
+  const nCf=S.personale.filter(p=>t(p.codice_fiscale)).length;
+  c.push([1,`Personale: ${S.personale.length} persone`+(nCf?`, codice fiscale per ${nCf}`:', nessun codice fiscale')]);
+  const mal=S.personale.filter(p=>t(p.codice_fiscale)&&!cfOk(t(p.codice_fiscale))).length;
+  if(mal)c.push([0,`${mal} codice/i fiscale/i con formato anomalo`]);
+  c.push(S.opzioni_confermate?[1,'Opzioni confermate']:[0,'Opzioni non ancora confermate']);
+  return c;
+}
+const bloccante=()=>!t(S.struttura.ragione_sociale);
+
+/* ================= Viste ================= */
+function vHome(){
+  const s=S.struttura;
+  const strutt=t(s.ragione_sociale)&&emailOk(t(s.pec))&&s.profilo?['ok','Completa']:(t(s.ragione_sociale)?['wip','In corso']:['todo','Da fare']);
+  const dpo=S.dpo.presente?(t(S.dpo.nome_denominazione)?['ok','Compilato']:['wip','In corso']):['todo','Facoltativo'];
+  const sog=S.soggetti.length?['wip',S.soggetti.length+' inseriti']:['todo','Da fare'];
+  const per=S.personale.length?['wip',S.personale.length+' persone']:['todo','Da fare'];
+  const opz=S.opzioni_confermate?['ok','Confermate']:['todo','Da fare'];
+  const riga=(v,n,d,[c,l])=>`<button class="riga" data-act="vai" data-v="${v}"><span class="t"><b>${n}</b><span>${d}</span></span><span class="chip ${c}">${l}</span></button>`;
+  return `<div class="pill"><i></i>Offline · dati solo su questo telefono</div>
+  <div><h1>Scheda cliente</h1><div class="sub">${esc(t(s.ragione_sociale)||'[Ragione sociale]')} · visita del ${esc(s.data_documenti)}</div></div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+  ${riga('struttura','Struttura','Dati, PEC e profilo',strutt)}
+  ${riga('dpo','DPO',S.dpo.presente?'Nominato ('+S.dpo.tipo+')':'Facoltativo · non nominato',dpo)}
+  ${riga('soggetti','Soggetti','Referente, amministratore di sistema, autorizzati, manutentore, pulizie, responsabili',sog)}
+  ${riga('personale','Personale','Elenco del personale',per)}
+  ${riga('opzioni','Opzioni','Smartphone, chiavette, sindacati, videosorveglianza',opz)}
+  </div>
+  <div class="spazio"></div>
+  <button class="btn" data-act="vai" data-v="condividi">Fine visita · Condividi</button>
+  <div class="nota" style="text-align:center">Nessun dato lascia il telefono finché non premi Condividi.</div>`;
+}
+function vStruttura(){
+  const s=S.struttura;
+  const pecErr=t(s.pec)&&!emailOk(t(s.pec));
+  return `${testa('Struttura')}<div class="card">
+  ${campo('Ragione sociale','struttura.ragione_sociale',{ph:'Ragione sociale'})}
+  ${campo('Partita IVA','struttura.partita_iva',{ph:'11 cifre',im:'numeric'})}
+  ${campo('Indirizzo','struttura.indirizzo',{ph:'Via e numero civico'})}
+  <div class="cols">${campo('CAP','struttura.cap',{ph:'00000',im:'numeric',stile:'flex:0 0 84px'})}${campo('Comune','struttura.comune',{ph:'Comune'})}${campo('Prov.','struttura.provincia',{ph:'VR',up:1,stile:'flex:0 0 68px'})}</div>
+  <div class="cols">${campo('Telefono','struttura.telefono',{ph:'+39',type:'tel'})}${campo('E-mail','struttura.email',{ph:'nome@dominio.it',type:'email',im:'email'})}</div>
+  ${campo('PEC','struttura.pec',{ph:'nome@pec.it',type:'email',im:'email',tag:'OBBLIGATORIA',tagErr:1,err:pecErr})}
+  <div><div class="lbl" style="margin-bottom:6px">Profilo</div>${scelta('struttura.profilo',PROFILI)}</div>
+  ${campo('Data dei documenti','struttura.data_documenti',{type:'date'})}
+  <div class="campo"><div class="lbl">Logo (facoltativo)</div>
+    <div class="cols" style="align-items:center">${S.logo?`<img class="logo" alt="Logo" src="${S.logo}"><button class="btn sec" style="min-height:44px;font-size:14px" data-act="logo-del">Rimuovi</button>`:`<label class="btn sec" style="min-height:44px;font-size:14px;cursor:pointer">Aggiungi logo<input type="file" accept="image/*" data-logo style="display:none"></label>`}</div></div>
+  </div><button class="btn" data-act="vai" data-v="home">Salva</button>`;
+}
+function vDpo(){
+  const d=S.dpo;
+  let corpo='';
+  if(d.presente){
+    corpo=`<div><div class="lbl" style="margin-bottom:6px">Tipo</div>${scelta('dpo.tipo',[['interno','Interno'],['esterno','Esterno']])}</div>
+    <div><div class="lbl" style="margin-bottom:6px">Natura</div>${scelta('dpo.natura',[['fisica','Persona fisica'],['giuridica','Persona giuridica']])}</div>
+    ${campo('Nome o denominazione','dpo.nome_denominazione',{ph:'Nome o denominazione'})}
+    ${d.tipo==='esterno'?`${campo('Codice fiscale','dpo.codice_fiscale',{up:1,ph:'Codice fiscale'})}${campo('Partita IVA','dpo.partita_iva',{im:'numeric',ph:'11 cifre'})}${campo('Sede','dpo.sede',{ph:'Indirizzo della sede'})}`:''}
+    <div class="cols">${campo('Telefono','dpo.telefono',{type:'tel',ph:'+39'})}${campo('E-mail','dpo.email',{type:'email',im:'email',ph:'nome@dominio.it'})}</div>
+    ${d.tipo==='interno'?'<div class="avviso oro">DPO interno: bastano nominativo e contatti.</div>':''}`;
+  }
+  return `${testa('DPO')}
+  ${interr('DPO nominato','dpo.presente')}
+  ${d.presente?'':'<div class="nota">Se il DPO non c\'è, nei documenti si tolgono tutti i riferimenti.</div>'}
+  ${corpo?`<div class="card">${corpo}</div>`:''}
+  <button class="btn" data-act="vai" data-v="home">Salva</button>`;
+}
+function vSoggetti(){
+  const lista=S.soggetti.map((x,i)=>`<button class="riga" data-act="edit-sogg" data-i="${i}"><span class="t"><b style="font-size:16px">${esc(x.nome_denominazione)}</b><span>${esc(x.categoria_mansione||'')}${x.credenziali?' · credenziali '+x.credenziali:''}</span></span><span class="chip todo">${esc(RUOLO_L[x.ruolo]||x.ruolo)}</span></button>`).join('');
+  const acc=SEZIONI_ACCESSO.includes(D.ruolo);
+  return `${testa('Soggetti')}
+  <div style="display:flex;flex-direction:column;gap:8px">${lista||'<div class="nota">Nessun soggetto inserito.</div>'}</div>
+  <div class="card"><h2>${IDX===null?'Nuovo soggetto':'Modifica soggetto'}</h2>
+    <div><div class="lbl" style="margin-bottom:6px">Ruolo</div>${scelta('d.ruolo',RUOLI,'pill-s')}</div>
+    ${campo('Nome o denominazione','d.nome_denominazione',{ph:'Nome o denominazione'})}
+    ${campo('Indirizzo','d.indirizzo',{ph:'Via e numero civico'})}
+    ${campo('Categoria o mansione','d.categoria_mansione',{ph:'Es. tecnico informatico',list:'mansioni'})}
+    ${acc?`<div><div class="lbl" style="margin-bottom:6px">Credenziali</div>${scelta('d.credenziali',[['fisse','Fisse'],['occasionali','Occasionali']])}<div class="nota" style="margin-top:4px">Proposto: fisse per l'amministratore di sistema, occasionali per il manutentore.</div></div>${campo('Ambiti di intervento','d.ambiti_intervento',{ph:'Es. server, gestionale, rete'})}`:''}
+    ${campo('Codice fiscale o P.IVA','d.cf_piva',{up:1,ph:'Facoltativo',tag:'FACOLTATIVO'})}
+    <div class="avviso oro">Codice fiscale o P.IVA: inseriscilo solo se serve all'atto di nomina.</div>
+    <button class="btn" data-act="salva-sogg">${IDX===null?'Aggiungi soggetto':'Salva modifiche'}</button>
+    ${IDX!==null?'<button class="btn peric" data-act="del-sogg">Elimina soggetto</button><button class="btn sec" data-act="annulla">Annulla</button>':''}
+  </div>`;
+}
+function vPersonale(){
+  const lista=S.personale.map((p,i)=>`<button class="riga" style="min-height:44px;padding:10px 14px" data-act="edit-pers" data-i="${i}"><span class="t"><b style="font-size:15px">${esc(p.cognome)} ${esc(p.nome)}</b></span><span class="nota">${esc(p.ruolo||'')}</span></button>`).join('');
+  return `${testa('Personale',`<span class="nota" style="margin-left:auto">${S.personale.length} persone</span>`)}
+  <div style="display:flex;flex-direction:column;gap:6px">${lista||'<div class="nota">Nessuna persona inserita.</div>'}</div>
+  <div class="card"><h2>${IDX===null?'Nuova persona':'Modifica persona'}</h2>
+    <div class="cols">${campo('Cognome','d.cognome',{ph:'Cognome'})}${campo('Nome','d.nome',{ph:'Nome'})}</div>
+    ${campo('Ruolo','d.ruolo',{ph:'Es. Igienista dentale',list:'mansioni'})}
+    ${campo('E-mail','d.email',{type:'email',im:'email',ph:'nome@dominio.it'})}
+    ${campo('Codice fiscale','d.codice_fiscale',{up:1,ph:'Lascia vuoto se non serve',tag:'FACOLTATIVO'})}
+    ${campo('Note','d.note',{ph:'Note'})}
+    <div class="avviso err">Non inserire dati sulla salute o altri dati particolari.</div>
+    <button class="btn" data-act="salva-pers">${IDX===null?'Aggiungi persona':'Salva modifiche'}</button>
+    ${IDX!==null?'<button class="btn peric" data-act="del-pers">Elimina persona</button><button class="btn sec" data-act="annulla">Annulla</button>':''}
+  </div>`;
+}
+function vOpzioni(){
+  return `${testa('Opzioni')}
+  <div style="display:flex;flex-direction:column;gap:8px">${OPZIONI.map(([k,l])=>interr(l,'opzioni.'+k)).join('')}</div>
+  <button class="btn" data-act="conferma-opz">Conferma opzioni</button>`;
+}
+function vCondividi(){
+  const c=controlli();
+  const nome=base();
+  return `${testa('Fine visita')}
+  <div class="ctl"><b style="font-size:14px;color:var(--indaco-scuro)">Controllo prima dell'invio</b>${c.map(([ok,tx])=>`<div style="color:${ok?'var(--celadon)':'var(--vermilio)'}"><i style="background:currentColor"></i><span>${esc(tx)}</span></div>`).join('')}</div>
+  <div style="display:flex;flex-direction:column;gap:8px"><div class="lbl">Verranno inviati insieme</div>
+    <div class="file"><div class="s" style="background:var(--indaco-chiaro);color:var(--indaco)">JSON</div><div><div class="n">scheda_${esc(nome)}.json</div><div class="nota">Importabile nell'app · con controllo di integrità</div></div></div>
+    <div class="file"><div class="s" style="background:var(--oro-chiaro);color:var(--oro)">PDF</div><div><div class="n">riepilogo_${esc(nome)}.pdf</div><div class="nota">Leggibile da chiunque, senza l'app</div></div></div>
+    ${S.logo?`<div class="file"><div class="s" style="background:var(--celadon-chiaro);color:var(--celadon)">LOGO</div><div><div class="n">logo_${esc(nome)}.png</div><div class="nota">Facoltativo</div></div></div>`:''}
+  </div>
+  <div class="nota">Se il file importabile non si apre o risulta danneggiato, l'app lo segnala e il riepilogo PDF basta per rifare il lavoro.</div>
+  <div class="spazio"></div>
+  ${bloccante()?'<div class="avviso err">Manca la ragione sociale: inseriscila nella Struttura.</div>':''}
+  <button class="btn" data-act="share" ${bloccante()?'disabled':''}>Condividi (email, WhatsApp…)</button>
+  <div class="dopo"><b>Dopo l'invio</b><p>Elimina i file da chat e posta dopo l'importazione nell'app. Su WhatsApp usa i messaggi temporanei.</p><button class="btn peric" data-act="svuota">Svuota dati dal telefono</button></div>`;
+}
+const VISTE={home:vHome,struttura:vStruttura,dpo:vDpo,soggetti:vSoggetti,personale:vPersonale,opzioni:vOpzioni,condividi:vCondividi};
+function render(){
+  document.getElementById('app').innerHTML=VISTE[VIEW]()+`<datalist id="mansioni">${MANSIONI.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>`;
+  window.scrollTo(0,0);
+}
+function vai(v){VIEW=v;D=nuovaBozza(v);IDX=null;render();}
+function nuovaBozza(v){
+  if(v==='soggetti')return {ruolo:'',nome_denominazione:'',indirizzo:'',categoria_mansione:'',credenziali:'',ambiti_intervento:'',cf_piva:''};
+  if(v==='personale')return {cognome:'',nome:'',ruolo:'',email:'',codice_fiscale:'',note:''};
+  return {};
+}
+
+/* ================= Esportazione ================= */
+const base=()=>`${slug(S.struttura.ragione_sociale)}_${S.struttura.data_documenti||oggi()}`;
+function costruisci(){
+  const s=S.struttura,d=S.dpo;
+  const dpo=d.presente
+    ?{presente:true,tipo:d.tipo,natura:d.natura,nome_denominazione:t(d.nome_denominazione),codice_fiscale:d.tipo==='esterno'?t(d.codice_fiscale).toUpperCase():'',partita_iva:d.tipo==='esterno'?t(d.partita_iva).replace(/\s/g,''):'',sede:d.tipo==='esterno'?t(d.sede):'',telefono:t(d.telefono),email:t(d.email)}
+    :{presente:false};
+  return {
+    schema:SCHEMA,versione:VERSIONE,creata_il:new Date().toISOString(),
+    struttura:{ragione_sociale:t(s.ragione_sociale),partita_iva:t(s.partita_iva).replace(/\s/g,''),indirizzo:t(s.indirizzo),cap:t(s.cap),comune:t(s.comune),provincia:t(s.provincia).toUpperCase(),telefono:t(s.telefono),email:t(s.email),pec:t(s.pec),profilo:s.profilo||'',data_documenti:s.data_documenti||oggi(),logo:!!S.logo},
+    dpo,
+    soggetti:S.soggetti.map(x=>({ruolo:x.ruolo,nome_denominazione:t(x.nome_denominazione),indirizzo:t(x.indirizzo),cf_piva:t(x.cf_piva).toUpperCase(),categoria_mansione:t(x.categoria_mansione),credenziali:SEZIONI_ACCESSO.includes(x.ruolo)?(x.credenziali||''):'',ambiti_intervento:SEZIONI_ACCESSO.includes(x.ruolo)?t(x.ambiti_intervento):''})),
+    personale:S.personale.map(p=>({cognome:t(p.cognome),nome:t(p.nome),ruolo:t(p.ruolo),email:t(p.email),codice_fiscale:t(p.codice_fiscale).toUpperCase(),note:t(p.note)})),
+    opzioni:{...S.opzioni}
+  };
+}
+async function sha256(txt){
+  if(!(window.crypto&&crypto.subtle))return null;
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function creaJson(){
+  const o=costruisci();
+  const h=await sha256(JSON.stringify(o));
+  o.checksum=h?'sha256:'+h:null;
+  return JSON.stringify(o,null,2);
+}
+function creaPdf(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const o=costruisci();
+  const M=18,W=210-2*M;let y=M;
+  const salto=h=>{if(y+h>287){doc.addPage();y=M;}};
+  const titolo=x=>{salto(14);y+=3;doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(11,31,74);doc.text(x,M,y);y+=2;doc.setDrawColor(255,90,18);doc.line(M,y,M+W,y);y+=5;};
+  const riga=(k,v)=>{if(!t(v))return;doc.setFontSize(10);const righe=doc.splitTextToSize(String(v),W-58);salto(5*righe.length);doc.setFont('helvetica','bold');doc.setTextColor(91,92,115);doc.text(k,M,y);doc.setFont('helvetica','normal');doc.setTextColor(30,31,59);doc.text(righe,M+58,y);y+=5*righe.length;};
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(11,31,74);doc.text('Scheda cliente · riepilogo',M,y);y+=7;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(91,92,115);doc.text('Wiseman & Partners · Settore Privacy · generato il '+o.creata_il.slice(0,10),M,y);y+=4;
+  const s=o.struttura;
+  titolo('Struttura');
+  riga('Ragione sociale',s.ragione_sociale);riga('Partita IVA',s.partita_iva);riga('Indirizzo',[s.indirizzo,[[s.cap,s.comune].filter(Boolean).join(' '),s.provincia&&'('+s.provincia+')'].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+  riga('Telefono',s.telefono);riga('E-mail',s.email);riga('PEC',s.pec);riga('Profilo',(PROFILI.find(p=>p[0]===s.profilo)||['',''])[1]);riga('Data documenti',s.data_documenti);
+  titolo('DPO');
+  if(!o.dpo.presente)riga('DPO','Non nominato');
+  else{const d=o.dpo;riga('Tipo',d.tipo+' · '+d.natura);riga('Nome o denominazione',d.nome_denominazione);riga('Codice fiscale',d.codice_fiscale);riga('Partita IVA',d.partita_iva);riga('Sede',d.sede);riga('Telefono',d.telefono);riga('E-mail',d.email);}
+  titolo('Soggetti ('+o.soggetti.length+')');
+  o.soggetti.forEach(x=>{riga(RUOLO_L[x.ruolo]||x.ruolo,x.nome_denominazione);riga('  Indirizzo',x.indirizzo);riga('  CF / P.IVA',x.cf_piva);riga('  Mansione',x.categoria_mansione);riga('  Credenziali',x.credenziali);riga('  Ambiti',x.ambiti_intervento);y+=1.5;});
+  titolo('Personale ('+o.personale.length+')');
+  o.personale.forEach(p=>{riga(p.cognome+' '+p.nome,[p.ruolo,p.email,p.codice_fiscale&&'CF '+p.codice_fiscale,p.note].filter(Boolean).join(' · '));});
+  titolo('Opzioni');
+  OPZIONI.forEach(([k,l])=>riga(l,o.opzioni[k]?'Sì':'No'));
+  return doc.output('blob');
+}
+async function logoFile(){
+  if(!S.logo)return null;
+  const r=await fetch(S.logo);const b=await r.blob();
+  return new File([b],`logo_${base()}.png`,{type:'image/png'});
+}
+async function condividi(){
+  try{
+    const nome=base();
+    const json=new File([await creaJson()],`scheda_${nome}.json`,{type:'application/json'});
+    const pdf=new File([creaPdf()],`riepilogo_${nome}.pdf`,{type:'application/pdf'});
+    const files=[json,pdf];const lg=await logoFile();if(lg)files.push(lg);
+    if(navigator.canShare&&navigator.canShare({files})){
+      await navigator.share({files,title:'Scheda cliente',text:'Scheda cliente'});
+    }else{
+      files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*400));
+      toast('Condivisione non disponibile: file scaricati');
+    }
+  }catch(e){if(e&&e.name!=='AbortError')toast('Errore: '+(e.message||e));}
+}
+function riduciLogo(file){
+  return new Promise(res=>{
+    const img=new Image();const u=URL.createObjectURL(file);
+    img.onload=()=>{const m=400,k=Math.min(1,m/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/png'));};
+    img.onerror=()=>res(null);img.src=u;
+  });
+}
+
+/* ================= Eventi ================= */
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;let v=e.target.value;if(e.target.hasAttribute('autocapitalize')&&e.target.autocapitalize==='characters')v=v.toUpperCase();set(k,v);if(k.startsWith('struttura.')||k.startsWith('dpo.'))salva();if(e.target.classList.contains('err')&&k==='struttura.pec'&&emailOk(v))e.target.classList.remove('err');});
+document.addEventListener('change',async e=>{
+  if(e.target.matches('[data-logo]')&&e.target.files[0]){S.logo=await riduciLogo(e.target.files[0]);salva();render();}
+});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act,k=b.dataset.k,v=b.dataset.v,i=b.dataset.i!==undefined?+b.dataset.i:null;
+  if(a==='vai'){salva();vai(v);}
+  else if(a==='set'){
+    set(k,v);
+    if(k==='d.ruolo'&&VIEW==='soggetti'){if(v==='amministratore_sistema')D.credenziali='fisse';else if(v==='manutentore')D.credenziali='occasionali';else D.credenziali='';}
+    salva();render();
+  }
+  else if(a==='toggle'){set(k,!get(k));if(k.startsWith('opzioni.'))S.opzioni_confermate=false;salva();render();}
+  else if(a==='conferma-opz'){S.opzioni_confermate=true;salva();vai('home');}
+  else if(a==='logo-del'){S.logo=null;salva();render();}
+  else if(a==='salva-sogg'){
+    if(!D.ruolo||!t(D.nome_denominazione)){toast('Servono ruolo e nome o denominazione');return;}
+    if(IDX===null)S.soggetti.push({...D});else S.soggetti[IDX]={...D};
+    salva();D=nuovaBozza('soggetti');IDX=null;render();
+  }
+  else if(a==='edit-sogg'){IDX=i;D={...S.soggetti[i]};render();window.scrollTo(0,document.body.scrollHeight);}
+  else if(a==='del-sogg'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(IDX,1);salva();D=nuovaBozza('soggetti');IDX=null;render();}}
+  else if(a==='salva-pers'){
+    if(!t(D.cognome)||!t(D.nome)){toast('Servono cognome e nome');return;}
+    if(IDX===null)S.personale.push({...D});else S.personale[IDX]={...D};
+    salva();D=nuovaBozza('personale');IDX=null;render();
+  }
+  else if(a==='edit-pers'){IDX=i;D={...S.personale[i]};render();window.scrollTo(0,document.body.scrollHeight);}
+  else if(a==='del-pers'){if(confirm('Eliminare questa persona?')){S.personale.splice(IDX,1);salva();D=nuovaBozza('personale');IDX=null;render();}}
+  else if(a==='annulla'){D=nuovaBozza(VIEW);IDX=null;render();}
+  else if(a==='share'){salva();condividi();}
+  else if(a==='svuota'){if(confirm('Cancellare dal telefono TUTTI i dati di questa scheda? Assicurati di averla già inviata.')){localStorage.removeItem(KEY);S=vuota();D={};IDX=null;VIEW='home';render();toast('Dati cancellati da questo telefono');}}
+});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+window.__test={get S(){return S;},set S(x){S=x;},costruisci,creaJson,creaPdf,render,vai,controlli};
+render();
+</script>
+</body>
+</html>

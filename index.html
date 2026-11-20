@@ -205,6 +205,8 @@ let toastT;function toast(m){const e=document.getElementById('toast');e.textCont
 
 /* ================= Componenti ================= */
 const icoBack='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3A3F8C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+const icoCestino='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
+const cestino=(act,i,lbl)=>`<button type="button" class="btn peric" style="width:52px;min-height:52px;padding:0;flex:none;border-radius:14px" aria-label="${lbl}" data-act="${act}" data-i="${i}">${icoCestino}</button>`;
 const testa=(titolo,extra='')=>`<div class="top"><button class="back" data-act="vai" data-v="home" aria-label="Indietro">${icoBack}</button><h1>${titolo}</h1>${extra}</div>`;
 function campo(lbl,path,o={}){
   const id='f_'+path.replace(/\W/g,'_');
@@ -296,10 +298,11 @@ function vDpo(){
   ${d.presente?`<button class="riga" data-act="dpo-wiseman"><span class="t"><b style="font-size:16px">Wiseman &amp; Partners</b><span>Inserisci i dati del DPO esterno</span></span><span class="chip" style="background:var(--arancio);color:var(--testo)">Inserisci</span></button>`:''}
   ${d.presente?'':'<div class="nota">Se il DPO non c\'è, nei documenti si tolgono tutti i riferimenti.</div>'}
   ${corpo?`<div class="card">${corpo}</div>`:''}
-  <button class="btn" data-act="vai" data-v="home">Salva</button>`;
+  <button class="btn" data-act="vai" data-v="home">Salva</button>
+  ${d.presente?'<button class="btn peric" data-act="dpo-rimuovi">Rimuovi DPO</button>':''}`;
 }
 function vSoggetti(){
-  const lista=S.soggetti.map((x,i)=>`<button class="riga" data-act="edit-sogg" data-i="${i}"><span class="t"><b style="font-size:16px">${esc(x.nome)}</b><span>${esc(x.ruolo==='responsabile'?(x.categorie||[]).map(k=>CATEGORIA_L[k]).filter(Boolean).join(', '):(x.mansione||''))}${x.credenziali?' · credenziali '+x.credenziali:''}</span></span><span class="chip todo">${esc(RUOLO_L[x.ruolo]||x.ruolo)}</span></button>`).join('');
+  const lista=S.soggetti.map((x,i)=>`<div style="display:flex;gap:8px;align-items:stretch"><button class="riga" data-act="edit-sogg" data-i="${i}"><span class="t"><b style="font-size:16px">${esc(x.nome)}</b><span>${esc(x.ruolo==='responsabile'?(x.categorie||[]).map(k=>CATEGORIA_L[k]).filter(Boolean).join(', '):(x.mansione||''))}${x.credenziali?' · credenziali '+x.credenziali:''}</span></span><span class="chip todo">${esc(RUOLO_L[x.ruolo]||x.ruolo)}</span></button>${cestino('del-sogg-l',i,'Elimina soggetto')}</div>`).join('');
   const acc=SEZIONI_ACCESSO.includes(D.ruolo);
   return `${testa('Soggetti')}
   <div style="display:flex;flex-direction:column;gap:8px">${lista||'<div class="nota">Nessun soggetto inserito.</div>'}</div>
@@ -319,7 +322,7 @@ function vSoggetti(){
   </div>`;
 }
 function vPersonale(){
-  const lista=S.personale.map((p,i)=>`<button class="riga" style="min-height:44px;padding:10px 14px" data-act="edit-pers" data-i="${i}"><span class="t"><b style="font-size:15px">${esc(p.cognome)} ${esc(p.nome)}</b></span><span class="nota">${esc(p.ruolo||(p.mansioni||[]).map(k=>MANSIONE_L[k]).filter(Boolean).join(', '))}</span></button>`).join('');
+  const lista=S.personale.map((p,i)=>`<div style="display:flex;gap:8px;align-items:stretch"><button class="riga" style="min-height:44px;padding:10px 14px" data-act="edit-pers" data-i="${i}"><span class="t"><b style="font-size:15px">${esc(p.cognome)} ${esc(p.nome)}</b></span><span class="nota">${esc(p.ruolo||(p.mansioni||[]).map(k=>MANSIONE_L[k]).filter(Boolean).join(', '))}</span></button>${cestino('del-pers-l',i,'Elimina persona')}</div>`).join('');
   return `${testa('Personale',`<span class="nota" style="margin-left:auto">${S.personale.length} persone</span>`)}
   <div style="display:flex;flex-direction:column;gap:6px">${lista||'<div class="nota">Nessuna persona inserita.</div>'}</div>
   <div class="card"><h2>${IDX===null?'Nuova persona':'Modifica persona'}</h2>
@@ -344,7 +347,7 @@ function vTrattamenti(){
   const blocchi=TRATT.map(([n,l,ops])=>{
     const on=trAtt(n);
     const vis=on?ops.filter(o=>o[3]!=='medicina_estetica'||est):[];
-    return `<div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="sw" role="switch" aria-checked="${on}" data-act="tr-att" data-t="${n}"><span class="t">${l}</span><span class="b"></span></button>${vis.map(([k,lb,def])=>{const v=trOpt(n,k,def);return `<button type="button" class="sw" style="margin-left:16px;width:calc(100% - 16px);min-height:46px" role="switch" aria-checked="${v}" data-act="tr-opt" data-t="${n}" data-o="${k}"><span class="t" style="font-weight:500">${lb}</span><span class="b"></span></button>`;}).join('')}</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="sw" role="switch" aria-checked="${on}" data-act="tr-att" data-t="${n}"><span class="t">${l}</span><span class="b"></span></button>${S.trattamenti[n]?`<button type="button" class="btn sec" style="width:auto;min-height:36px;padding:0 14px;font-size:13px;align-self:flex-start" data-act="tr-reset" data-t="${n}">Azzera (torna come da profilo)</button>`:''}${vis.map(([k,lb,def])=>{const v=trOpt(n,k,def);return `<button type="button" class="sw" style="margin-left:16px;width:calc(100% - 16px);min-height:46px" role="switch" aria-checked="${v}" data-act="tr-opt" data-t="${n}" data-o="${k}"><span class="t" style="font-weight:500">${lb}</span><span class="b"></span></button>`;}).join('')}</div>`;
   }).join('');
   return `${testa('Trattamenti')}
   <div class="nota">Attiva i trattamenti presenti. Le voci che non tocchi restano come da profilo nel gestionale.</div>
@@ -532,6 +535,10 @@ document.addEventListener('click',async e=>{
     if(nome&&nome!==WISEMAN.nome_denominazione&&!confirm('Sostituire i dati del DPO con quelli di Wiseman & Partners?'))return;
     Object.assign(S.dpo,WISEMAN,{presente:true});salva();render(true);toast('Dati Wiseman & Partners inseriti');
   }
+  else if(a==='tr-reset'){delete S.trattamenti[tt];salva();render(true);}
+  else if(a==='dpo-rimuovi'){if(confirm('Rimuovere il DPO e cancellarne i dati?')){S.dpo=vuota().dpo;salva();render(true);toast('DPO rimosso');}}
+  else if(a==='del-sogg-l'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(i,1);salva();D=nuovaBozza('soggetti');IDX=null;render(true);}}
+  else if(a==='del-pers-l'){if(confirm('Eliminare questa persona?')){S.personale.splice(i,1);salva();D=nuovaBozza('personale');IDX=null;render(true);}}
   else if(a==='salva-tel'){salva();salvaTelefono();}
   else if(a==='cambia-cartella'){try{await cartella(true);render(true);}catch(e){if(e&&e.name!=='AbortError')toast('Selezione cartella non disponibile');}}
   else if(a==='conferma-opz'){S.opzioni_confermate=true;salva();vai('home');}

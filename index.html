@@ -122,30 +122,74 @@ input:focus,textarea:focus,button:focus-visible{outline:3px solid #FF5A12}
 /* ================= Stato ================= */
 const KEY='scheda_cliente_v1';
 const SCHEMA='wiseman-scheda-cliente';
-const VERSIONE=1;
+const VERSIONE=2;
 const oggi=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 const vuota=()=>({
+  v:2,
   struttura:{ragione_sociale:'',partita_iva:'',indirizzo:'',cap:'',comune:'',provincia:'',telefono:'',email:'',pec:'',profilo:'',data_documenti:oggi()},
   dpo:{presente:false,tipo:'esterno',natura:'giuridica',nome_denominazione:'',codice_fiscale:'',partita_iva:'',sede:'',telefono:'',email:''},
   soggetti:[],personale:[],
-  opzioni:{smartphone_tablet:false,chiavette_internet:false,accordo_sindacati:false,videosorveglianza:false},
+  opzioni:{smartphone_tablet:false,chiavette_internet:false,accordo_sindacati:false},
+  trattamenti:{},
   opzioni_confermate:false,
   logo:null
 });
 let S;
-try{S=Object.assign(vuota(),JSON.parse(localStorage.getItem(KEY)||'null')||{});}catch(e){S=vuota();}
+try{const st=JSON.parse(localStorage.getItem(KEY)||'null');S=Object.assign(vuota(),st||{});if(st)S.v=st.v||1;}catch(e){S=vuota();}
+/* Migrazione dati salvati con la versione 1 */
+function migra(s){
+  if(s.v===2)return;
+  const pers=s.personale||[],nuovi=[];
+  (s.soggetti||[]).forEach(x=>{
+    const idv=String(x.cf_piva||'').replace(/\s/g,'').toUpperCase();
+    if(x.ruolo==='autorizzato'){pers.push({cognome:String(x.nome_denominazione||'').trim(),nome:'',ruolo:String(x.categoria_mansione||'').trim(),mansioni:[],email:'',codice_fiscale:idv.length===16?idv:'',note:''});return;}
+    const ruolo=({referente_privacy:'referente',amministratore_sistema:'ads'})[x.ruolo]||x.ruolo;
+    const piva=/^\d{11}$/.test(idv);
+    nuovi.push({ruolo,tipo:(piva||!idv)?'giuridica':'fisica',nome:String(x.nome_denominazione||'').trim(),indirizzo:x.indirizzo||'',cf:piva?'':idv,piva:piva?idv:'',mansione:x.categoria_mansione||'',credenziali:x.credenziali||'',ambiti:x.ambiti_intervento||'',categorie:[]});
+  });
+  pers.forEach(p=>{if(!Array.isArray(p.mansioni))p.mansioni=[];});
+  s.soggetti=nuovi;s.personale=pers;
+  s.trattamenti=s.trattamenti||{};
+  if(s.opzioni&&'videosorveglianza' in s.opzioni){
+    if(s.opzioni.videosorveglianza)s.trattamenti.videosorveglianza={attivo:true};
+    else if(s.opzioni_confermate)s.trattamenti.videosorveglianza={attivo:false};
+    delete s.opzioni.videosorveglianza;
+  }
+  s.v=2;
+}
+migra(S);try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
 let VIEW='home';
 let D={};            // bozza (soggetto/persona in modifica), solo in memoria
 let IDX=null;        // indice in modifica
 const salva=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Memoria piena: esporta e svuota');}};
 
 /* ================= Costanti ================= */
-const PROFILI=[['odontoiatria','Odontoiatria'],['poliambulatorio','Poliambulatorio'],['fisioterapia','Fisioterapia'],['ottica','Ottica']];
-const RUOLI=[['referente_privacy','Referente privacy'],['amministratore_sistema','Amministratore di sistema'],['autorizzato','Autorizzato'],['manutentore','Manutentore'],['pulizie','Pulizie'],['responsabile','Responsabile']];
+const PROFILI=[['odontoiatria','Odontoiatria'],['poliambulatorio','Poliambulatorio'],['fisioterapia','Fisioterapia'],['medicina_estetica','Medicina estetica'],['ottica','Ottica'],['palestra','Palestra']];
+const RUOLI=[['referente','Referente privacy'],['ads','Amministratore di sistema'],['amministratore','Amministratore'],['socio','Socio'],['manutentore','Manutentore'],['pulizie','Pulizie'],['responsabile','Responsabile del trattamento']];
 const RUOLO_L=Object.fromEntries(RUOLI);
-const OPZIONI=[['smartphone_tablet','Smartphone e tablet aziendali'],['chiavette_internet','Chiavette internet'],['accordo_sindacati','Accordo con i sindacati'],['videosorveglianza','Videosorveglianza']];
-const MANSIONI=['Odontoiatra','Igienista dentale','Assistente alla poltrona','Segreteria','Medico','Fisioterapista','Infermiere','Ottico','Optometrista','Amministrazione'];
-const SEZIONI_ACCESSO=['amministratore_sistema','manutentore'];
+const OPZIONI=[['smartphone_tablet','Smartphone e tablet aziendali'],['chiavette_internet','Chiavette internet'],['accordo_sindacati','Accordo con i sindacati']];
+const OPZ_EXP={smartphone_tablet:'telefonia',chiavette_internet:'chiavette',accordo_sindacati:'accordo_sind'};
+const MANSIONI=[['segreteria','Segreteria'],['reception','Reception'],['odontoiatra','Odontoiatra'],['igienista','Igienista dentale'],['aso','Assistente alla poltrona (ASO)'],['medico','Medico'],['direttore_sanitario','Direttore sanitario'],['fisioterapista','Fisioterapista'],['infermiere','Infermiere'],['psicologo','Psicologo'],['nutrizionista','Nutrizionista'],['ottico','Ottico'],['optometrista','Optometrista'],['amministrazione','Amministrazione'],['risorse_umane','Risorse umane'],['formatore','Formatore'],['istruttore','Istruttore'],['direttore_tecnico','Direttore tecnico'],['bagnino','Bagnino'],['pulizie','Pulizie'],['admin','Amministratore di sistema (admin)']];
+const MANSIONE_L=Object.fromEntries(MANSIONI);
+const CATEGORIE=[['commercialista','Commercialista'],['consulente_lavoro','Consulente del lavoro'],['lab_odontotecnico','Laboratorio odontotecnico'],['lab_analisi','Laboratorio analisi'],['fornitore_software','Fornitore software'],['assistenza_it','Assistenza IT'],['marketing','Marketing'],['consulente_sicurezza','Consulente sicurezza'],['consulente_autorizzazioni','Consulente autorizzazioni'],['avvocato','Avvocato'],['professionista_sanitario','Professionista sanitario'],['titolare_autonomo','Titolare autonomo']];
+const CATEGORIA_L=Object.fromEntries(CATEGORIE);
+const SEZIONI_ACCESSO=['ads','manutentore'];
+/* Trattamenti: [chiave, etichetta, [[opzione, etichetta, acceso di default, solo per profilo]]] */
+const TRATT=[
+ ['pazienti','Pazienti',[['minorenni','Minorenni',true],['dermatologia','Dermatologia',false,'medicina_estetica'],['ia','Intelligenza artificiale'],['marketing','Marketing'],['grafometrica','Firma grafometrica'],['dossier','Dossier sanitario'],['foto_ulteriori','Foto ulteriori']]],
+ ['clienti','Clienti',[['minorenni','Minorenni',true],['vendita_online','Vendita online']]],
+ ['iscritti','Iscritti',[['minorenni','Minorenni',true],['marketing','Marketing'],['addebito','Addebito'],['finanziamento','Finanziamento'],['scheda_allenamento','Scheda di allenamento'],['asd','ASD'],['assicurazione','Assicurazione'],['aggregatori','Aggregatori'],['personal_esterni','Personal trainer esterni'],['img_personale','Immagini del personale'],['profilazione','Profilazione']]],
+ ['corsisti','Corsisti',[['lezioni_registrate','Lezioni registrate']]],
+ ['personale','Personale',[['biometria','Biometria']]],
+ ['sito','Sito web',[['cookie_non_tecnici','Cookie non tecnici'],['cookie_profilazione','Cookie di profilazione'],['geolocalizzazione','Geolocalizzazione'],['newsletter','Newsletter'],['prenotazione','Prenotazione online'],['prenotazione_note','Prenotazione: note'],['prenotazione_software','Prenotazione: software'],['prenotazione_marketplace','Prenotazione: marketplace'],['prenotazione_promemoria','Prenotazione: promemoria']]],
+ ['videosorveglianza','Videosorveglianza',[['manutenzione','Manutenzione'],['cloud','Cloud']]],
+ ['immagini','Immagini',[['minorenni','Minorenni',true]]],
+ ['fornitori','Fornitori',[]],
+ ['candidati','Candidati',[]]
+];
+const WISEMAN={tipo:'esterno',natura:'giuridica',nome_denominazione:'Wiseman & Partners Srl Stp',codice_fiscale:'04992010282',partita_iva:'04992010282',sede:'Via Della Croce Rossa 9/B, 35129 Padova PD',telefono:'0498074121',email:'DPO@wmpartners.it'};
+const trAtt=n=>!!(S.trattamenti[n]&&S.trattamenti[n].attivo);
+const trOpt=(n,o,def)=>{const x=S.trattamenti[n];return x&&o in x?!!x[o]:!!def;};
 
 /* ================= Utilità ================= */
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -172,6 +216,7 @@ function campo(lbl,path,o={}){
   return `<div class="campo" ${o.stile?`style="${o.stile}"`:''}><div class="rig"><label for="${id}">${lbl}</label>${o.tag?`<span class="tag ${o.tagErr?'err':''}">${o.tag}</span>`:''}</div>${inp}</div>`;
 }
 const scelta=(path,opts,cls='')=>`<div class="scelte ${cls}" role="group">${opts.map(([v,l])=>`<button type="button" class="scelta ${get(path)===v?'on':''}" aria-pressed="${get(path)===v}" data-act="set" data-k="${path}" data-v="${v}">${l}</button>`).join('')}</div>`;
+const multi=(path,opts)=>`<div class="scelte pill-s" role="group">${opts.map(([v,l])=>{const on=(get(path)||[]).includes(v);return `<button type="button" class="scelta ${on?'on':''}" aria-pressed="${on}" data-act="multi" data-k="${path}" data-v="${v}">${l}</button>`;}).join('')}</div>`;
 const interr=(lbl,path)=>`<button type="button" class="sw" role="switch" aria-checked="${!!get(path)}" data-act="toggle" data-k="${path}"><span class="t">${lbl}</span><span class="b"></span></button>`;
 
 /* ================= Controlli ================= */
@@ -184,6 +229,7 @@ function controlli(){
   if(S.dpo.presente)c.push(t(S.dpo.nome_denominazione)?[1,'DPO '+S.dpo.tipo+': '+t(S.dpo.nome_denominazione)]:[0,'DPO nominato ma senza nominativo']);
   else c.push([1,'DPO non nominato (nessun riferimento nei documenti)']);
   c.push([1,`Soggetti: ${S.soggetti.length} inseriti`]);
+  c.push([1,`Trattamenti: ${Object.keys(S.trattamenti).length} impostati`]);
   const nCf=S.personale.filter(p=>t(p.codice_fiscale)).length;
   c.push([1,`Personale: ${S.personale.length} persone`+(nCf?`, codice fiscale per ${nCf}`:', nessun codice fiscale')]);
   const mal=S.personale.filter(p=>t(p.codice_fiscale)&&!cfOk(t(p.codice_fiscale))).length;
@@ -201,15 +247,18 @@ function vHome(){
   const sog=S.soggetti.length?['wip',S.soggetti.length+' inseriti']:['todo','Da fare'];
   const per=S.personale.length?['wip',S.personale.length+' persone']:['todo','Da fare'];
   const opz=S.opzioni_confermate?['ok','Confermate']:['todo','Da fare'];
+  const nTr=Object.keys(S.trattamenti).length;
+  const tra=nTr?['wip',nTr+' impostati']:['todo','Da fare'];
   const riga=(v,n,d,[c,l])=>`<button class="riga" data-act="vai" data-v="${v}"><span class="t"><b>${n}</b><span>${d}</span></span><span class="chip ${c}">${l}</span></button>`;
   return `<div class="pill"><i></i>Offline · dati solo su questo telefono</div>
   <div><h1>Scheda cliente</h1><div class="sub">${esc(t(s.ragione_sociale)||'[Ragione sociale]')} · visita del ${esc(s.data_documenti)}</div></div>
   <div style="display:flex;flex-direction:column;gap:10px">
   ${riga('struttura','Struttura','Dati, PEC e profilo',strutt)}
   ${riga('dpo','DPO',S.dpo.presente?'Nominato ('+S.dpo.tipo+')':'Facoltativo · non nominato',dpo)}
-  ${riga('soggetti','Soggetti','Referente, amministratore di sistema, autorizzati, manutentore, pulizie, responsabili',sog)}
+  ${riga('soggetti','Soggetti','Referente, amministratore di sistema, manutentore, pulizie, responsabili',sog)}
   ${riga('personale','Personale','Elenco del personale',per)}
-  ${riga('opzioni','Opzioni','Smartphone, chiavette, sindacati, videosorveglianza',opz)}
+  ${riga('trattamenti','Trattamenti','Pazienti, clienti, sito, videosorveglianza…',tra)}
+  ${riga('opzioni','Opzioni','Smartphone, chiavette, sindacati',opz)}
   </div>
   <div class="spazio"></div>
   <button class="btn" data-act="vai" data-v="condividi">Fine visita · Condividi</button>
@@ -244,34 +293,39 @@ function vDpo(){
   }
   return `${testa('DPO')}
   ${interr('DPO nominato','dpo.presente')}
+  ${d.presente?`<button class="riga" data-act="dpo-wiseman"><span class="t"><b style="font-size:16px">Wiseman &amp; Partners</b><span>Inserisci i dati del DPO esterno</span></span><span class="chip" style="background:var(--arancio);color:var(--testo)">Inserisci</span></button>`:''}
   ${d.presente?'':'<div class="nota">Se il DPO non c\'è, nei documenti si tolgono tutti i riferimenti.</div>'}
   ${corpo?`<div class="card">${corpo}</div>`:''}
   <button class="btn" data-act="vai" data-v="home">Salva</button>`;
 }
 function vSoggetti(){
-  const lista=S.soggetti.map((x,i)=>`<button class="riga" data-act="edit-sogg" data-i="${i}"><span class="t"><b style="font-size:16px">${esc(x.nome_denominazione)}</b><span>${esc(x.categoria_mansione||'')}${x.credenziali?' · credenziali '+x.credenziali:''}</span></span><span class="chip todo">${esc(RUOLO_L[x.ruolo]||x.ruolo)}</span></button>`).join('');
+  const lista=S.soggetti.map((x,i)=>`<button class="riga" data-act="edit-sogg" data-i="${i}"><span class="t"><b style="font-size:16px">${esc(x.nome)}</b><span>${esc(x.ruolo==='responsabile'?(x.categorie||[]).map(k=>CATEGORIA_L[k]).filter(Boolean).join(', '):(x.mansione||''))}${x.credenziali?' · credenziali '+x.credenziali:''}</span></span><span class="chip todo">${esc(RUOLO_L[x.ruolo]||x.ruolo)}</span></button>`).join('');
   const acc=SEZIONI_ACCESSO.includes(D.ruolo);
   return `${testa('Soggetti')}
   <div style="display:flex;flex-direction:column;gap:8px">${lista||'<div class="nota">Nessun soggetto inserito.</div>'}</div>
   <div class="card"><h2>${IDX===null?'Nuovo soggetto':'Modifica soggetto'}</h2>
     <div><div class="lbl" style="margin-bottom:6px">Ruolo</div>${scelta('d.ruolo',RUOLI,'pill-s')}</div>
-    ${campo('Nome o denominazione','d.nome_denominazione',{ph:'Nome o denominazione'})}
+    ${D.ruolo==='responsabile'?`<div><div class="lbl" style="margin-bottom:6px">Categorie</div>${multi('d.categorie',CATEGORIE)}</div>`:''}
+    <div><div class="lbl" style="margin-bottom:6px">Natura</div>${scelta('d.tipo',[['fisica','Persona fisica'],['giuridica','Persona giuridica']])}</div>
+    ${campo(D.tipo==='fisica'?'Nome e cognome':'Denominazione','d.nome',{ph:D.tipo==='fisica'?'Nome e cognome':'Denominazione'})}
     ${campo('Indirizzo','d.indirizzo',{ph:'Via e numero civico'})}
-    ${campo('Categoria o mansione','d.categoria_mansione',{ph:'Es. tecnico informatico',list:'mansioni'})}
-    ${acc?`<div><div class="lbl" style="margin-bottom:6px">Credenziali</div>${scelta('d.credenziali',[['fisse','Fisse'],['occasionali','Occasionali']])}<div class="nota" style="margin-top:4px">Proposto: fisse per l'amministratore di sistema, occasionali per il manutentore.</div></div>${campo('Ambiti di intervento','d.ambiti_intervento',{ph:'Es. server, gestionale, rete'})}`:''}
-    ${campo('Codice fiscale o P.IVA','d.cf_piva',{up:1,ph:'Facoltativo',tag:'FACOLTATIVO'})}
-    <div class="avviso oro">Codice fiscale o P.IVA: inseriscilo solo se serve all'atto di nomina.</div>
+    ${campo('Mansione','d.mansione',{ph:'Es. tecnico informatico',list:'mansioni'})}
+    ${acc?`<div><div class="lbl" style="margin-bottom:6px">Credenziali</div>${scelta('d.credenziali',[['fisse','Fisse'],['occasionali','Occasionali']])}<div class="nota" style="margin-top:4px">Proposto: fisse per l'amministratore di sistema, occasionali per il manutentore.</div></div>${campo('Ambiti di intervento','d.ambiti',{ph:'Es. server, gestionale, rete'})}`:''}
+    ${campo('Codice fiscale','d.cf',{up:1,ph:'Facoltativo',tag:'FACOLTATIVO'})}
+    ${campo('Partita IVA','d.piva',{im:'numeric',ph:'Facoltativo, 11 cifre',tag:'FACOLTATIVO'})}
+    <div class="avviso oro">Codice fiscale e P.IVA: inseriscili solo se servono all'atto di nomina.</div>
     <button class="btn" data-act="salva-sogg">${IDX===null?'Aggiungi soggetto':'Salva modifiche'}</button>
     ${IDX!==null?'<button class="btn peric" data-act="del-sogg">Elimina soggetto</button><button class="btn sec" data-act="annulla">Annulla</button>':''}
   </div>`;
 }
 function vPersonale(){
-  const lista=S.personale.map((p,i)=>`<button class="riga" style="min-height:44px;padding:10px 14px" data-act="edit-pers" data-i="${i}"><span class="t"><b style="font-size:15px">${esc(p.cognome)} ${esc(p.nome)}</b></span><span class="nota">${esc(p.ruolo||'')}</span></button>`).join('');
+  const lista=S.personale.map((p,i)=>`<button class="riga" style="min-height:44px;padding:10px 14px" data-act="edit-pers" data-i="${i}"><span class="t"><b style="font-size:15px">${esc(p.cognome)} ${esc(p.nome)}</b></span><span class="nota">${esc(p.ruolo||(p.mansioni||[]).map(k=>MANSIONE_L[k]).filter(Boolean).join(', '))}</span></button>`).join('');
   return `${testa('Personale',`<span class="nota" style="margin-left:auto">${S.personale.length} persone</span>`)}
   <div style="display:flex;flex-direction:column;gap:6px">${lista||'<div class="nota">Nessuna persona inserita.</div>'}</div>
   <div class="card"><h2>${IDX===null?'Nuova persona':'Modifica persona'}</h2>
     <div class="cols">${campo('Cognome','d.cognome',{ph:'Cognome'})}${campo('Nome','d.nome',{ph:'Nome'})}</div>
-    ${campo('Ruolo','d.ruolo',{ph:'Es. Igienista dentale',list:'mansioni'})}
+    <div><div class="lbl" style="margin-bottom:6px">Mansioni</div>${multi('d.mansioni',MANSIONI)}</div>
+    ${campo('Ruolo (testo libero)','d.ruolo',{ph:'Se vuoto, si usano le mansioni',list:'mansioni'})}
     ${campo('E-mail','d.email',{type:'email',im:'email',ph:'nome@dominio.it'})}
     ${campo('Codice fiscale','d.codice_fiscale',{up:1,ph:'Lascia vuoto se non serve',tag:'FACOLTATIVO'})}
     ${campo('Note','d.note',{ph:'Note'})}
@@ -284,6 +338,18 @@ function vOpzioni(){
   return `${testa('Opzioni')}
   <div style="display:flex;flex-direction:column;gap:8px">${OPZIONI.map(([k,l])=>interr(l,'opzioni.'+k)).join('')}</div>
   <button class="btn" data-act="conferma-opz">Conferma opzioni</button>`;
+}
+function vTrattamenti(){
+  const est=S.struttura.profilo==='medicina_estetica';
+  const blocchi=TRATT.map(([n,l,ops])=>{
+    const on=trAtt(n);
+    const vis=on?ops.filter(o=>o[3]!=='medicina_estetica'||est):[];
+    return `<div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="sw" role="switch" aria-checked="${on}" data-act="tr-att" data-t="${n}"><span class="t">${l}</span><span class="b"></span></button>${vis.map(([k,lb,def])=>{const v=trOpt(n,k,def);return `<button type="button" class="sw" style="margin-left:16px;width:calc(100% - 16px);min-height:46px" role="switch" aria-checked="${v}" data-act="tr-opt" data-t="${n}" data-o="${k}"><span class="t" style="font-weight:500">${lb}</span><span class="b"></span></button>`;}).join('')}</div>`;
+  }).join('');
+  return `${testa('Trattamenti')}
+  <div class="nota">Attiva i trattamenti presenti. Le voci che non tocchi restano come da profilo nel gestionale.</div>
+  <div style="display:flex;flex-direction:column;gap:12px">${blocchi}</div>
+  <button class="btn" data-act="vai" data-v="home">Salva</button>`;
 }
 function vCondividi(){
   const c=controlli();
@@ -299,34 +365,59 @@ function vCondividi(){
   <div class="spazio"></div>
   ${bloccante()?'<div class="avviso err">Manca la ragione sociale: inseriscila nella Struttura.</div>':''}
   <button class="btn" data-act="share" ${bloccante()?'disabled':''}>Condividi (email, WhatsApp…)</button>
+  <button class="btn sec" data-act="salva-tel" ${bloccante()?'disabled':''}>Salva sul telefono</button>
+  <div class="nota">Cartella: ${esc(cartellaNome()||'Download')}${window.showDirectoryPicker?'':' · per sceglierla ogni volta: Chrome → Impostazioni → Download → «Chiedi dove salvare i file»'}</div>
+  ${window.showDirectoryPicker?'<button class="btn sec" style="min-height:44px;font-size:14px" data-act="cambia-cartella">Cambia cartella</button>':''}
   <div class="dopo"><b>Dopo l'invio</b><p>Elimina i file da chat e posta dopo l'importazione nell'app. Su WhatsApp usa i messaggi temporanei.</p><button class="btn peric" data-act="svuota">Svuota dati dal telefono</button></div>`;
 }
-const VISTE={home:vHome,struttura:vStruttura,dpo:vDpo,soggetti:vSoggetti,personale:vPersonale,opzioni:vOpzioni,condividi:vCondividi};
-function render(){
-  document.getElementById('app').innerHTML=VISTE[VIEW]()+`<datalist id="mansioni">${MANSIONI.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>`;
-  window.scrollTo(0,0);
+const VISTE={home:vHome,struttura:vStruttura,dpo:vDpo,soggetti:vSoggetti,personale:vPersonale,trattamenti:vTrattamenti,opzioni:vOpzioni,condividi:vCondividi};
+function render(keep){
+  const y=window.scrollY;
+  document.getElementById('app').innerHTML=VISTE[VIEW]()+`<datalist id="mansioni">${MANSIONI.map(m=>`<option value="${esc(m[1])}">`).join('')}</datalist>`;
+  window.scrollTo(0,keep?y:0);
 }
 function vai(v){VIEW=v;D=nuovaBozza(v);IDX=null;render();}
 function nuovaBozza(v){
-  if(v==='soggetti')return {ruolo:'',nome_denominazione:'',indirizzo:'',categoria_mansione:'',credenziali:'',ambiti_intervento:'',cf_piva:''};
-  if(v==='personale')return {cognome:'',nome:'',ruolo:'',email:'',codice_fiscale:'',note:''};
+  if(v==='soggetti')return {ruolo:'',tipo:'giuridica',nome:'',indirizzo:'',mansione:'',credenziali:'',ambiti:'',cf:'',piva:'',categorie:[]};
+  if(v==='personale')return {cognome:'',nome:'',ruolo:'',mansioni:[],email:'',codice_fiscale:'',note:''};
   return {};
 }
 
 /* ================= Esportazione ================= */
 const base=()=>`${slug(S.struttura.ragione_sociale)}_${S.struttura.data_documenti||oggi()}`;
+const dataIt=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?`${m[3]}/${m[2]}/${m[1]}`:'';};
+function trattamentiExp(){
+  const est=S.struttura.profilo==='medicina_estetica',out={};
+  TRATT.forEach(([n,,ops])=>{
+    const x=S.trattamenti[n];if(!x)return;
+    if(!x.attivo){out[n]={attivo:false};return;}
+    const r={attivo:true};
+    ops.forEach(([k,,def,solo])=>{if(solo&&solo==='medicina_estetica'&&!est)return;if(k in x)r[k]=!!x[k];else if(def)r[k]=true;});
+    out[n]=r;
+  });
+  return out;
+}
 function costruisci(){
   const s=S.struttura,d=S.dpo;
   const dpo=d.presente
-    ?{presente:true,tipo:d.tipo,natura:d.natura,nome_denominazione:t(d.nome_denominazione),codice_fiscale:d.tipo==='esterno'?t(d.codice_fiscale).toUpperCase():'',partita_iva:d.tipo==='esterno'?t(d.partita_iva).replace(/\s/g,''):'',sede:d.tipo==='esterno'?t(d.sede):'',telefono:t(d.telefono),email:t(d.email)}
-    :{presente:false};
+    ?{attivo:true,origine:d.tipo,tipo:d.natura,nome:t(d.nome_denominazione),cf:d.tipo==='esterno'?t(d.codice_fiscale).toUpperCase():'',piva:d.tipo==='esterno'?t(d.partita_iva).replace(/\s/g,''):'',sede:d.tipo==='esterno'?t(d.sede):'',telefono:t(d.telefono),email:t(d.email)}
+    :{attivo:false};
   return {
     schema:SCHEMA,versione:VERSIONE,creata_il:new Date().toISOString(),
-    struttura:{ragione_sociale:t(s.ragione_sociale),partita_iva:t(s.partita_iva).replace(/\s/g,''),indirizzo:t(s.indirizzo),cap:t(s.cap),comune:t(s.comune),provincia:t(s.provincia).toUpperCase(),telefono:t(s.telefono),email:t(s.email),pec:t(s.pec),profilo:s.profilo||'',data_documenti:s.data_documenti||oggi(),logo:!!S.logo},
+    struttura:{titolare:t(s.ragione_sociale),piva:t(s.partita_iva).replace(/\s/g,''),indirizzo:t(s.indirizzo),cap:t(s.cap),comune:t(s.comune),provincia:t(s.provincia).toUpperCase(),telefono:t(s.telefono),email:t(s.email),pec:t(s.pec),profilo:s.profilo||'',data:dataIt(s.data_documenti||oggi()),logo:!!S.logo},
     dpo,
-    soggetti:S.soggetti.map(x=>({ruolo:x.ruolo,nome_denominazione:t(x.nome_denominazione),indirizzo:t(x.indirizzo),cf_piva:t(x.cf_piva).toUpperCase(),categoria_mansione:t(x.categoria_mansione),credenziali:SEZIONI_ACCESSO.includes(x.ruolo)?(x.credenziali||''):'',ambiti_intervento:SEZIONI_ACCESSO.includes(x.ruolo)?t(x.ambiti_intervento):''})),
-    personale:S.personale.map(p=>({cognome:t(p.cognome),nome:t(p.nome),ruolo:t(p.ruolo),email:t(p.email),codice_fiscale:t(p.codice_fiscale).toUpperCase(),note:t(p.note)})),
-    opzioni:{...S.opzioni}
+    soggetti:S.soggetti.map(x=>{
+      const o={ruolo:x.ruolo,tipo:x.tipo||'giuridica',nome:t(x.nome),cf:t(x.cf).toUpperCase(),piva:t(x.piva).replace(/\s/g,''),indirizzo:t(x.indirizzo),mansione:t(x.mansione)};
+      if(SEZIONI_ACCESSO.includes(x.ruolo)){o.credenziali=x.credenziali||'';o.ambiti=t(x.ambiti);}
+      if(x.ruolo==='responsabile')o.categorie=(x.categorie||[]).slice();
+      return o;
+    }),
+    personale:S.personale.map(p=>{
+      const m=(p.mansioni||[]).slice();
+      return {nome:[t(p.cognome),t(p.nome)].filter(Boolean).join(' '),ruolo:t(p.ruolo)||m.map(k=>MANSIONE_L[k]).filter(Boolean).join(', '),mansioni:m,email:t(p.email),cf:t(p.codice_fiscale).toUpperCase(),note:t(p.note)};
+    }),
+    opzioni:Object.fromEntries(OPZIONI.map(([k])=>[OPZ_EXP[k],!!S.opzioni[k]])),
+    trattamenti:trattamentiExp()
   };
 }
 async function sha256(txt){
@@ -352,17 +443,20 @@ function creaPdf(){
   doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(91,92,115);doc.text('Wiseman & Partners · Settore Privacy · generato il '+o.creata_il.slice(0,10),M,y);y+=4;
   const s=o.struttura;
   titolo('Struttura');
-  riga('Ragione sociale',s.ragione_sociale);riga('Partita IVA',s.partita_iva);riga('Indirizzo',[s.indirizzo,[[s.cap,s.comune].filter(Boolean).join(' '),s.provincia&&'('+s.provincia+')'].filter(Boolean).join(' ')].filter(Boolean).join(', '));
-  riga('Telefono',s.telefono);riga('E-mail',s.email);riga('PEC',s.pec);riga('Profilo',(PROFILI.find(p=>p[0]===s.profilo)||['',''])[1]);riga('Data documenti',s.data_documenti);
+  riga('Titolare',s.titolare);riga('Partita IVA',s.piva);riga('Indirizzo',[s.indirizzo,[[s.cap,s.comune].filter(Boolean).join(' '),s.provincia&&'('+s.provincia+')'].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+  riga('Telefono',s.telefono);riga('E-mail',s.email);riga('PEC',s.pec);riga('Profilo',(PROFILI.find(p=>p[0]===s.profilo)||['',''])[1]);riga('Data documenti',s.data);
   titolo('DPO');
-  if(!o.dpo.presente)riga('DPO','Non nominato');
-  else{const d=o.dpo;riga('Tipo',d.tipo+' · '+d.natura);riga('Nome o denominazione',d.nome_denominazione);riga('Codice fiscale',d.codice_fiscale);riga('Partita IVA',d.partita_iva);riga('Sede',d.sede);riga('Telefono',d.telefono);riga('E-mail',d.email);}
+  if(!o.dpo.attivo)riga('DPO','Non nominato');
+  else{const d=o.dpo;riga('Tipo',d.origine+' · '+d.tipo);riga('Nome o denominazione',d.nome);riga('Codice fiscale',d.cf);riga('Partita IVA',d.piva);riga('Sede',d.sede);riga('Telefono',d.telefono);riga('E-mail',d.email);}
   titolo('Soggetti ('+o.soggetti.length+')');
-  o.soggetti.forEach(x=>{riga(RUOLO_L[x.ruolo]||x.ruolo,x.nome_denominazione);riga('  Indirizzo',x.indirizzo);riga('  CF / P.IVA',x.cf_piva);riga('  Mansione',x.categoria_mansione);riga('  Credenziali',x.credenziali);riga('  Ambiti',x.ambiti_intervento);y+=1.5;});
+  o.soggetti.forEach(x=>{riga(RUOLO_L[x.ruolo]||x.ruolo,x.nome+' ('+x.tipo+')');riga('  Indirizzo',x.indirizzo);riga('  Codice fiscale',x.cf);riga('  Partita IVA',x.piva);riga('  Mansione',x.mansione);riga('  Categorie',(x.categorie||[]).map(k=>CATEGORIA_L[k]).join(', '));riga('  Credenziali',x.credenziali);riga('  Ambiti',x.ambiti);y+=1.5;});
   titolo('Personale ('+o.personale.length+')');
-  o.personale.forEach(p=>{riga(p.cognome+' '+p.nome,[p.ruolo,p.email,p.codice_fiscale&&'CF '+p.codice_fiscale,p.note].filter(Boolean).join(' · '));});
+  o.personale.forEach(p=>{riga(p.nome,[p.ruolo,p.email,p.cf&&'CF '+p.cf,p.note].filter(Boolean).join(' · '));});
   titolo('Opzioni');
-  OPZIONI.forEach(([k,l])=>riga(l,o.opzioni[k]?'Sì':'No'));
+  OPZIONI.forEach(([k,l])=>riga(l,o.opzioni[OPZ_EXP[k]]?'Sì':'No'));
+  titolo('Trattamenti');
+  if(!Object.keys(o.trattamenti).length)riga('Trattamenti','Nessuna impostazione (restano quelle del profilo)');
+  TRATT.forEach(([n,l,ops])=>{const x=o.trattamenti[n];if(!x)return;if(!x.attivo){riga(l,'Non attivo');return;}const att=ops.filter(([k])=>x[k]).map(([,lb])=>lb);riga(l,'Attivo'+(att.length?': '+att.join(', '):''));});
   return doc.output('blob');
 }
 async function logoFile(){
@@ -370,19 +464,42 @@ async function logoFile(){
   const r=await fetch(S.logo);const b=await r.blob();
   return new File([b],`logo_${base()}.png`,{type:'image/png'});
 }
+async function prepara(){
+  const nome=base();
+  const json=new File([await creaJson()],`scheda_${nome}.json`,{type:'application/json'});
+  const pdf=new File([creaPdf()],`riepilogo_${nome}.pdf`,{type:'application/pdf'});
+  const files=[json,pdf];const lg=await logoFile();if(lg)files.push(lg);
+  return files;
+}
+function scarica(files){files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*400));}
 async function condividi(){
   try{
-    const nome=base();
-    const json=new File([await creaJson()],`scheda_${nome}.json`,{type:'application/json'});
-    const pdf=new File([creaPdf()],`riepilogo_${nome}.pdf`,{type:'application/pdf'});
-    const files=[json,pdf];const lg=await logoFile();if(lg)files.push(lg);
+    const files=await prepara();
     if(navigator.canShare&&navigator.canShare({files})){
       await navigator.share({files,title:'Scheda cliente',text:'Scheda cliente'});
-    }else{
-      files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*400));
-      toast('Condivisione non disponibile: file scaricati');
-    }
+    }else{scarica(files);toast('Condivisione non disponibile: file scaricati');}
   }catch(e){if(e&&e.name!=='AbortError')toast('Errore: '+(e.message||e));}
+}
+/* Salva sul telefono: cartella scelta (se il browser lo permette) oppure Download */
+const cartellaNome=()=>{try{return localStorage.getItem('scheda_cartella')||'';}catch(e){return '';}};
+const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('scheda_cfg',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+const idbGet=async k=>{const d=await idb();return new Promise((res,rej)=>{const q=d.transaction('k').objectStore('k').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});};
+const idbSet=async(k,v)=>{const d=await idb();return new Promise((res,rej)=>{const tx=d.transaction('k','readwrite');tx.objectStore('k').put(v,k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});};
+async function cartella(forza){
+  if(!window.showDirectoryPicker)return null;
+  let h=forza?null:await idbGet('dir').catch(()=>null);
+  if(h){try{let p=await h.queryPermission({mode:'readwrite'});if(p!=='granted')p=await h.requestPermission({mode:'readwrite'});if(p!=='granted')h=null;}catch(e){h=null;}}
+  if(!h){h=await window.showDirectoryPicker({mode:'readwrite'});await idbSet('dir',h).catch(()=>{});try{localStorage.setItem('scheda_cartella',h.name);}catch(e){}}
+  return h;
+}
+async function salvaTelefono(){
+  try{
+    let dir=null;
+    try{dir=await cartella(false);}catch(e){if(e&&e.name==='AbortError')return;dir=null;}
+    const files=await prepara();
+    if(dir){for(const f of files){const fh=await dir.getFileHandle(f.name,{create:true});const w=await fh.createWritable();await w.write(f);await w.close();}toast('Salvati nella cartella «'+dir.name+'»');}
+    else{scarica(files);toast('Salvati nella cartella Download');}
+  }catch(e){toast('Errore: '+(e.message||e));}
 }
 function riduciLogo(file){
   return new Promise(res=>{
@@ -399,25 +516,35 @@ document.addEventListener('change',async e=>{
 });
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
-  const a=b.dataset.act,k=b.dataset.k,v=b.dataset.v,i=b.dataset.i!==undefined?+b.dataset.i:null;
+  const a=b.dataset.act,k=b.dataset.k,v=b.dataset.v,i=b.dataset.i!==undefined?+b.dataset.i:null,tt=b.dataset.t,oo=b.dataset.o;
   if(a==='vai'){salva();vai(v);}
   else if(a==='set'){
     set(k,v);
-    if(k==='d.ruolo'&&VIEW==='soggetti'){if(v==='amministratore_sistema')D.credenziali='fisse';else if(v==='manutentore')D.credenziali='occasionali';else D.credenziali='';}
-    salva();render();
+    if(k==='d.ruolo'&&VIEW==='soggetti'){if(v==='ads')D.credenziali='fisse';else if(v==='manutentore')D.credenziali='occasionali';else D.credenziali='';}
+    salva();render(true);
   }
-  else if(a==='toggle'){set(k,!get(k));if(k.startsWith('opzioni.'))S.opzioni_confermate=false;salva();render();}
+  else if(a==='multi'){const arr=(get(k)||[]).slice();const j=arr.indexOf(v);if(j>=0)arr.splice(j,1);else arr.push(v);set(k,arr);render(true);}
+  else if(a==='toggle'){set(k,!get(k));if(k.startsWith('opzioni.'))S.opzioni_confermate=false;salva();render(true);}
+  else if(a==='tr-att'){const x=S.trattamenti[tt]||(S.trattamenti[tt]={});x.attivo=!x.attivo;if(x.attivo){const def=TRATT.find(r=>r[0]===tt)[2];def.forEach(([ok,,d])=>{if(d&&!(ok in x))x[ok]=true;});}salva();render(true);}
+  else if(a==='tr-opt'){const def=TRATT.find(r=>r[0]===tt)[2].find(o=>o[0]===oo);const x=S.trattamenti[tt];x[oo]=!trOpt(tt,oo,def[2]);salva();render(true);}
+  else if(a==='dpo-wiseman'){
+    const nome=t(S.dpo.nome_denominazione);
+    if(nome&&nome!==WISEMAN.nome_denominazione&&!confirm('Sostituire i dati del DPO con quelli di Wiseman & Partners?'))return;
+    Object.assign(S.dpo,WISEMAN,{presente:true});salva();render(true);toast('Dati Wiseman & Partners inseriti');
+  }
+  else if(a==='salva-tel'){salva();salvaTelefono();}
+  else if(a==='cambia-cartella'){try{await cartella(true);render(true);}catch(e){if(e&&e.name!=='AbortError')toast('Selezione cartella non disponibile');}}
   else if(a==='conferma-opz'){S.opzioni_confermate=true;salva();vai('home');}
   else if(a==='logo-del'){S.logo=null;salva();render();}
   else if(a==='salva-sogg'){
-    if(!D.ruolo||!t(D.nome_denominazione)){toast('Servono ruolo e nome o denominazione');return;}
+    if(!D.ruolo||!t(D.nome)){toast('Servono ruolo e nome o denominazione');return;}
     if(IDX===null)S.soggetti.push({...D});else S.soggetti[IDX]={...D};
     salva();D=nuovaBozza('soggetti');IDX=null;render();
   }
-  else if(a==='edit-sogg'){IDX=i;D={...S.soggetti[i]};render();window.scrollTo(0,document.body.scrollHeight);}
+  else if(a==='edit-sogg'){IDX=i;D={...S.soggetti[i]};render(true);window.scrollTo(0,document.body.scrollHeight);}
   else if(a==='del-sogg'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(IDX,1);salva();D=nuovaBozza('soggetti');IDX=null;render();}}
   else if(a==='salva-pers'){
-    if(!t(D.cognome)||!t(D.nome)){toast('Servono cognome e nome');return;}
+    if(!t(D.cognome)||(IDX===null&&!t(D.nome))){toast('Servono cognome e nome');return;}
     if(IDX===null)S.personale.push({...D});else S.personale[IDX]={...D};
     salva();D=nuovaBozza('personale');IDX=null;render();
   }

@@ -122,7 +122,7 @@ input:focus,textarea:focus,button:focus-visible{outline:3px solid #FF5A12}
 /* ================= Stato ================= */
 const KEY='scheda_cliente_v1';
 const SCHEMA='wiseman-scheda-cliente';
-const VERSIONE=2;
+const VERSIONE=3;
 const oggi=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 const vuota=()=>({
   v:2,
@@ -131,6 +131,7 @@ const vuota=()=>({
   soggetti:[],personale:[],
   opzioni:{smartphone_tablet:false,chiavette_internet:false,accordo_sindacati:false},
   trattamenti:{},
+  sedi:[],
   opzioni_confermate:false,
   logo:null
 });
@@ -164,19 +165,20 @@ let IDX=null;        // indice in modifica
 const salva=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Memoria piena: esporta e svuota');}};
 
 /* ================= Costanti ================= */
-const PROFILI=[['odontoiatria','Odontoiatria'],['poliambulatorio','Poliambulatorio'],['fisioterapia','Fisioterapia'],['medicina_estetica','Medicina estetica'],['ottica','Ottica'],['palestra','Palestra']];
+const PROFILI=[['odontoiatria','Odontoiatria'],['poliambulatorio','Poliambulatorio'],['fisioterapia','Fisioterapia'],['medicina_estetica','Medicina estetica'],['medico_specialista','Medico specialista'],['medicina_lavoro','Medicina del lavoro'],['ottica','Ottica'],['palestra','Palestra']];
 const RUOLI=[['referente','Referente privacy'],['ads','Amministratore di sistema'],['amministratore','Amministratore'],['socio','Socio'],['manutentore','Manutentore'],['pulizie','Pulizie'],['responsabile','Responsabile del trattamento']];
 const RUOLO_L=Object.fromEntries(RUOLI);
 const OPZIONI=[['smartphone_tablet','Smartphone e tablet aziendali'],['chiavette_internet','Chiavette internet'],['accordo_sindacati','Accordo con i sindacati']];
 const OPZ_EXP={smartphone_tablet:'telefonia',chiavette_internet:'chiavette',accordo_sindacati:'accordo_sind'};
-const MANSIONI=[['segreteria','Segreteria'],['reception','Reception'],['odontoiatra','Odontoiatra'],['igienista','Igienista dentale'],['aso','Assistente alla poltrona (ASO)'],['medico','Medico'],['direttore_sanitario','Direttore sanitario'],['fisioterapista','Fisioterapista'],['infermiere','Infermiere'],['psicologo','Psicologo'],['nutrizionista','Nutrizionista'],['ottico','Ottico'],['optometrista','Optometrista'],['amministrazione','Amministrazione'],['risorse_umane','Risorse umane'],['formatore','Formatore'],['istruttore','Istruttore'],['direttore_tecnico','Direttore tecnico'],['bagnino','Bagnino'],['pulizie','Pulizie'],['admin','Amministratore di sistema (admin)']];
+const MANSIONI=[['segreteria','Segreteria'],['reception','Reception'],['odontoiatra','Odontoiatra'],['igienista','Igienista dentale'],['aso','Assistente alla poltrona (ASO)'],['medico','Medico'],['medico_competente','Medico competente (medicina del lavoro)'],['direttore_sanitario','Direttore sanitario'],['fisioterapista','Fisioterapista'],['infermiere','Infermiere'],['psicologo','Psicologo'],['nutrizionista','Nutrizionista'],['ottico','Ottico'],['optometrista','Optometrista'],['amministrazione','Amministrazione'],['risorse_umane','Risorse umane'],['formatore','Formatore'],['istruttore','Istruttore'],['direttore_tecnico','Direttore tecnico'],['bagnino','Bagnino'],['pulizie','Pulizie'],['admin','Amministratore di sistema (admin)']];
 const MANSIONE_L=Object.fromEntries(MANSIONI);
+const MANS_SANITARIE=MANSIONI.filter(m=>['odontoiatra','igienista','medico','medico_competente','direttore_sanitario','fisioterapista','infermiere','psicologo','nutrizionista','ottico','optometrista'].includes(m[0]));
 const CATEGORIE=[['commercialista','Commercialista'],['consulente_lavoro','Consulente del lavoro'],['lab_odontotecnico','Laboratorio odontotecnico'],['lab_analisi','Laboratorio analisi'],['fornitore_software','Fornitore software'],['assistenza_it','Assistenza IT'],['marketing','Marketing'],['consulente_sicurezza','Consulente sicurezza'],['consulente_autorizzazioni','Consulente autorizzazioni'],['avvocato','Avvocato'],['professionista_sanitario','Professionista sanitario'],['titolare_autonomo','Titolare autonomo']];
 const CATEGORIA_L=Object.fromEntries(CATEGORIE);
 const SEZIONI_ACCESSO=['ads','manutentore'];
 /* Trattamenti: [chiave, etichetta, [[opzione, etichetta, acceso di default, solo per profilo]]] */
 const TRATT=[
- ['pazienti','Pazienti',[['minorenni','Minorenni',true],['dermatologia','Dermatologia',false,'medicina_estetica'],['ia','Intelligenza artificiale'],['marketing','Marketing'],['grafometrica','Firma grafometrica'],['dossier','Dossier sanitario'],['foto_ulteriori','Foto ulteriori']]],
+ ['pazienti','Pazienti',[['minorenni','Minorenni',true],['dermatologia','Dermatologia',false,'medicina_estetica'],['ia','Intelligenza artificiale'],['marketing','Marketing'],['grafometrica','Firma grafometrica'],['dossier','Dossier sanitario'],['foto_ulteriori','Foto ulteriori'],['lavoro','Anche medicina del lavoro'],['sedi_clienti','Visite anche presso i clienti (aziende)'],['medici_collaboratori','Medici competenti collaboratori'],['cartelle_societa','La struttura conserva le cartelle sanitarie per i medici (accordo art. 28)']]],
  ['clienti','Clienti',[['minorenni','Minorenni',true],['vendita_online','Vendita online']]],
  ['iscritti','Iscritti',[['minorenni','Minorenni',true],['marketing','Marketing'],['addebito','Addebito'],['finanziamento','Finanziamento'],['scheda_allenamento','Scheda di allenamento'],['asd','ASD'],['assicurazione','Assicurazione'],['aggregatori','Aggregatori'],['personal_esterni','Personal trainer esterni'],['img_personale','Immagini del personale'],['profilazione','Profilazione']]],
  ['corsisti','Corsisti',[['lezioni_registrate','Lezioni registrate']]],
@@ -188,8 +190,29 @@ const TRATT=[
  ['candidati','Candidati',[]]
 ];
 const WISEMAN={tipo:'esterno',natura:'giuridica',nome_denominazione:'Wiseman & Partners Srl Stp',codice_fiscale:'04992010282',partita_iva:'04992010282',sede:'Via Della Croce Rossa 9/B, 35129 Padova PD',telefono:'0498074121',email:'DPO@wmpartners.it'};
-const trAtt=n=>!!(S.trattamenti[n]&&S.trattamenti[n].attivo);
-const trOpt=(n,o,def)=>{const x=S.trattamenti[n];return x&&o in x?!!x[o]:!!def;};
+const optDef=(n,k)=>{const o=(TRATT.find(r=>r[0]===n)||[0,0,[]])[2].find(x=>x[0]===k);return o?!!o[2]:false;};
+const sedeCorrente=()=>(VIEW==='sede'||VIEW==='sede_tratt')?S.sedi[SIDX]:null;
+const profiloDi=sd=>(sd&&sd.profilo)||S.struttura.profilo;
+const effX=(n,sd)=>sd?{...(S.trattamenti[n]||{}),...(sd.trattamenti[n]||{})}:(S.trattamenti[n]||{});
+const mkG=(n,x)=>k=>k in x?!!x[k]:optDef(n,k);
+function optVisibile(n,k,prof,g){
+  if(k==='dermatologia')return prof==='medicina_estetica';
+  if(n!=='pazienti')return true;
+  const ml=prof==='medicina_lavoro';
+  if(ml&&['marketing','foto_ulteriori','minorenni'].includes(k))return false;
+  if(k==='lavoro')return prof==='poliambulatorio';
+  if(k==='sedi_clienti'||k==='medici_collaboratori')return ml||(prof==='poliambulatorio'&&g('lavoro'));
+  if(k==='cartelle_societa')return (ml||(prof==='poliambulatorio'&&g('lavoro')))&&g('medici_collaboratori');
+  return true;
+}
+function setTr(n,k,val,sd){
+  if(!sd){const x=S.trattamenti[n]||(S.trattamenti[n]={});x[k]=val;return;}
+  const o=sd.trattamenti[n]||(sd.trattamenti[n]={});o[k]=val;
+  const b=S.trattamenti[n];if(b&&k in b&&!!b[k]===!!val)delete o[k];
+  if(!Object.keys(o).length)delete sd.trattamenti[n];
+}
+const keyP=p=>[String(p.cognome||'').trim(),String(p.nome||'').trim()].filter(Boolean).join(' ');
+let SIDX=null;       // indice della sede in modifica
 
 /* ================= Utilità ================= */
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -198,7 +221,7 @@ const emailOk=s=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
 const pivaOk=s=>/^\d{11}$/.test(s.replace(/\s/g,''));
 const cfOk=s=>/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i.test(s)||/^\d{11}$/.test(s);
 const slug=s=>t(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'cliente';
-function ref(path){const p=path.split('.');let o=S;if(p[0]==='d'){o=D;p.shift();}for(let i=0;i<p.length-1;i++)o=o[p[i]];return [o,p[p.length-1]];}
+function ref(path){const p=path.split('.');let o=S;if(p[0]==='d'){o=D;p.shift();}else if(p[0]==='s'){o=S.sedi[SIDX];p.shift();}for(let i=0;i<p.length-1;i++)o=o[p[i]];return [o,p[p.length-1]];}
 const get=path=>{const [o,k]=ref(path);return o[k];};
 const set=(path,v)=>{const [o,k]=ref(path);o[k]=v;};
 let toastT;function toast(m){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>e.style.display='none',3200);}
@@ -207,7 +230,7 @@ let toastT;function toast(m){const e=document.getElementById('toast');e.textCont
 const icoBack='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3A3F8C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 const icoCestino='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
 const cestino=(act,i,lbl)=>`<button type="button" class="btn peric" style="width:52px;min-height:52px;padding:0;flex:none;border-radius:14px" aria-label="${lbl}" data-act="${act}" data-i="${i}">${icoCestino}</button>`;
-const testa=(titolo,extra='')=>`<div class="top"><button class="back" data-act="vai" data-v="home" aria-label="Indietro">${icoBack}</button><h1>${titolo}</h1>${extra}</div>`;
+const testa=(titolo,extra='',back='home')=>`<div class="top"><button class="back" data-act="vai" data-v="${back}" aria-label="Indietro">${icoBack}</button><h1>${titolo}</h1>${extra}</div>`;
 function campo(lbl,path,o={}){
   const id='f_'+path.replace(/\W/g,'_');
   const v=get(path)??'';
@@ -232,6 +255,7 @@ function controlli(){
   else c.push([1,'DPO non nominato (nessun riferimento nei documenti)']);
   c.push([1,`Soggetti: ${S.soggetti.length} inseriti`]);
   c.push([1,`Trattamenti: ${Object.keys(S.trattamenti).length} impostati`]);
+  if(S.sedi.length)c.push([1,`Sedi ulteriori: ${S.sedi.length}`]);
   const nCf=S.personale.filter(p=>t(p.codice_fiscale)).length;
   c.push([1,`Personale: ${S.personale.length} persone`+(nCf?`, codice fiscale per ${nCf}`:', nessun codice fiscale')]);
   const mal=S.personale.filter(p=>t(p.codice_fiscale)&&!cfOk(t(p.codice_fiscale))).length;
@@ -250,6 +274,8 @@ function vHome(){
   const per=S.personale.length?['wip',S.personale.length+' persone']:['todo','Da fare'];
   const opz=S.opzioni_confermate?['ok','Confermate']:['todo','Da fare'];
   const nTr=Object.keys(S.trattamenti).length;
+  const nSedi=S.sedi.length;
+  const sed=nSedi?['wip',nSedi+(nSedi===1?' inserita':' inserite')]:['todo','Facoltativo'];
   const tra=nTr?['wip',nTr+' impostati']:['todo','Da fare'];
   const riga=(v,n,d,[c,l])=>`<button class="riga" data-act="vai" data-v="${v}"><span class="t"><b>${n}</b><span>${d}</span></span><span class="chip ${c}">${l}</span></button>`;
   return `<div class="pill"><i></i>Offline · dati solo su questo telefono</div>
@@ -259,6 +285,7 @@ function vHome(){
   ${riga('dpo','DPO',S.dpo.presente?'Nominato ('+S.dpo.tipo+')':'Facoltativo · non nominato',dpo)}
   ${riga('soggetti','Soggetti','Referente, amministratore di sistema, manutentore, pulizie, responsabili',sog)}
   ${riga('personale','Personale','Elenco del personale',per)}
+  ${riga('sedi','Sedi','Sedi ulteriori oltre alla principale',sed)}
   ${riga('trattamenti','Trattamenti','Pazienti, clienti, sito, videosorveglianza…',tra)}
   ${riga('opzioni','Opzioni','Smartphone, chiavette, sindacati',opz)}
   </div>
@@ -280,7 +307,7 @@ function vStruttura(){
   ${campo('Data dei documenti','struttura.data_documenti',{type:'date'})}
   <div class="campo"><div class="lbl">Logo (facoltativo)</div>
     <div class="cols" style="align-items:center">${S.logo?`<img class="logo" alt="Logo" src="${S.logo}"><button class="btn sec" style="min-height:44px;font-size:14px" data-act="logo-del">Rimuovi</button>`:`<label class="btn sec" style="min-height:44px;font-size:14px;cursor:pointer">Aggiungi logo<input type="file" accept="image/*" data-logo style="display:none"></label>`}</div></div>
-  </div><button class="btn" data-act="vai" data-v="home">Salva</button>`;
+  </div><button class="btn sec" data-act="nuova-sede">+ Aggiungi sede</button><button class="btn" data-act="vai" data-v="home">Salva</button>`;
 }
 function vDpo(){
   const d=S.dpo;
@@ -309,6 +336,7 @@ function vSoggetti(){
   <div class="card"><h2>${IDX===null?'Nuovo soggetto':'Modifica soggetto'}</h2>
     <div><div class="lbl" style="margin-bottom:6px">Ruolo</div>${scelta('d.ruolo',RUOLI,'pill-s')}</div>
     ${D.ruolo==='responsabile'?`<div><div class="lbl" style="margin-bottom:6px">Categorie</div>${multi('d.categorie',CATEGORIE)}</div>`:''}
+    ${D.ruolo==='responsabile'&&(D.categorie||[]).includes('professionista_sanitario')?`<div><div class="lbl" style="margin-bottom:6px">Mansioni</div>${multi('d.mansioni',MANS_SANITARIE)}</div>`:''}
     <div><div class="lbl" style="margin-bottom:6px">Natura</div>${scelta('d.tipo',[['fisica','Persona fisica'],['giuridica','Persona giuridica']])}</div>
     ${campo(D.tipo==='fisica'?'Nome e cognome':'Denominazione','d.nome',{ph:D.tipo==='fisica'?'Nome e cognome':'Denominazione'})}
     ${campo('Indirizzo','d.indirizzo',{ph:'Via e numero civico'})}
@@ -342,17 +370,60 @@ function vOpzioni(){
   <div style="display:flex;flex-direction:column;gap:8px">${OPZIONI.map(([k,l])=>interr(l,'opzioni.'+k)).join('')}</div>
   <button class="btn" data-act="conferma-opz">Conferma opzioni</button>`;
 }
-function vTrattamenti(){
-  const est=S.struttura.profilo==='medicina_estetica';
-  const blocchi=TRATT.map(([n,l,ops])=>{
-    const on=trAtt(n);
-    const vis=on?ops.filter(o=>o[3]!=='medicina_estetica'||est):[];
-    return `<div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="sw" role="switch" aria-checked="${on}" data-act="tr-att" data-t="${n}"><span class="t">${l}</span><span class="b"></span></button>${S.trattamenti[n]?`<button type="button" class="btn sec" style="width:auto;min-height:36px;padding:0 14px;font-size:13px;align-self:flex-start" data-act="tr-reset" data-t="${n}">Azzera (torna come da profilo)</button>`:''}${vis.map(([k,lb,def])=>{const v=trOpt(n,k,def);return `<button type="button" class="sw" style="margin-left:16px;width:calc(100% - 16px);min-height:46px" role="switch" aria-checked="${v}" data-act="tr-opt" data-t="${n}" data-o="${k}"><span class="t" style="font-weight:500">${lb}</span><span class="b"></span></button>`;}).join('')}</div>`;
+function blocchiTratt(){
+  const sd=sedeCorrente(),prof=profiloDi(sd);
+  return TRATT.map(([n,l,ops])=>{
+    const x=effX(n,sd),on=!!x.attivo,g=mkG(n,x);
+    const vis=on?ops.filter(([k])=>optVisibile(n,k,prof,g)):[];
+    const toc=sd?!!sd.trattamenti[n]:!!S.trattamenti[n];
+    return `<div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="sw" role="switch" aria-checked="${on}" data-act="tr-att" data-t="${n}"><span class="t">${l}</span><span class="b"></span></button>${toc?`<button type="button" class="btn sec" style="width:auto;min-height:36px;padding:0 14px;font-size:13px;align-self:flex-start" data-act="tr-reset" data-t="${n}">${sd?'Azzera (come la sede principale)':'Azzera (torna come da profilo)'}</button>`:''}${vis.map(([k,lb])=>{const v=g(k);return `<button type="button" class="sw" style="margin-left:16px;width:calc(100% - 16px);min-height:46px" role="switch" aria-checked="${v}" data-act="tr-opt" data-t="${n}" data-o="${k}"><span class="t" style="font-weight:500">${lb}</span><span class="b"></span></button>`;}).join('')}</div>`;
   }).join('');
+}
+function vTrattamenti(){
   return `${testa('Trattamenti')}
   <div class="nota">Attiva i trattamenti presenti. Le voci che non tocchi restano come da profilo nel gestionale.</div>
-  <div style="display:flex;flex-direction:column;gap:12px">${blocchi}</div>
+  <div style="display:flex;flex-direction:column;gap:12px">${blocchiTratt()}</div>
   <button class="btn" data-act="vai" data-v="home">Salva</button>`;
+}
+function vSedi(){
+  const lista=S.sedi.map((x,i)=>`<div style="display:flex;gap:8px;align-items:stretch"><button class="riga" data-act="edit-sede" data-i="${i}"><span class="t"><b style="font-size:16px">${esc(x.nome)}</b><span>${esc([x.indirizzo,x.comune].filter(Boolean).join(', '))}</span></span><span class="chip todo">${esc((PROFILI.find(p=>p[0]===profiloDi(x))||['',''])[1]||'—')}</span></button>${cestino('del-sede-l',i,'Elimina sede')}</div>`).join('');
+  return `${testa('Sedi')}
+  <div class="nota">La sede principale è quella della scheda Struttura. Qui aggiungi le sedi ulteriori. Titolare, P.IVA, PEC, DPO, soggetti e opzioni valgono per tutte.</div>
+  <div style="display:flex;flex-direction:column;gap:8px">${lista||'<div class="nota">Nessuna sede ulteriore.</div>'}</div>
+  <button class="btn" data-act="nuova-sede">+ Aggiungi sede</button>`;
+}
+function vSede(){
+  const sd=S.sedi[SIDX];if(!sd)return vSedi();
+  const nMod=Object.keys(sd.trattamenti).length;
+  const rif=S.personale.map(p=>{const k=keyP(p);const on=sd.pers_rif.includes(k);return `<button type="button" class="sw" style="min-height:46px" role="switch" aria-checked="${on}" data-act="sede-pers" data-n="${esc(k)}"><span class="t" style="font-weight:500">${esc(k)}</span><span class="b"></span></button>`;}).join('');
+  const proprie=sd.personale.map((p,i)=>`<div style="display:flex;gap:8px;align-items:stretch"><div class="riga" style="min-height:44px;padding:10px 14px"><span class="t"><b style="font-size:15px">${esc(keyP(p))}</b></span><span class="nota">${esc(p.ruolo||(p.mansioni||[]).map(k=>MANSIONE_L[k]).filter(Boolean).join(', '))}</span></div>${cestino('del-sede-pers',i,'Elimina persona')}</div>`).join('');
+  return `${testa('Sede',`<span class="nota" style="margin-left:auto">${esc(t(sd.nome))}</span>`,'sedi')}
+  <div class="card">
+    ${campo('Nome della sede','s.nome',{ph:'Es. Sede di Padova',tag:'OBBLIGATORIO',tagErr:1})}
+    ${campo('Indirizzo','s.indirizzo',{ph:'Via e numero civico'})}
+    <div class="cols">${campo('CAP','s.cap',{ph:'00000',im:'numeric',stile:'flex:0 0 84px'})}${campo('Comune','s.comune',{ph:'Comune'})}${campo('Prov.','s.provincia',{ph:'VR',up:1,stile:'flex:0 0 68px'})}</div>
+    <div class="cols">${campo('Telefono','s.telefono',{ph:'Come il titolare',type:'tel'})}${campo('E-mail','s.email',{ph:'Come il titolare',type:'email',im:'email'})}</div>
+    <div class="nota">Telefono ed e-mail: vuoto = quelli del titolare.</div>
+    <div><div class="lbl" style="margin-bottom:6px">Profilo</div>${scelta('s.profilo',PROFILI)}</div>
+  </div>
+  <button class="riga" data-act="sede-tratt"><span class="t"><b>Trattamenti</b><span>Come la sede principale: modifica solo ciò che cambia</span></span><span class="chip ${nMod?'wip':'todo'}">${nMod?nMod+' modificati':'Come principale'}</span></button>
+  <div class="card"><h2>Personale della sede</h2>
+    ${S.personale.length?`<div class="lbl" style="margin-bottom:2px">Porta anche in questa sede</div><div style="display:flex;flex-direction:column;gap:6px">${rif}</div>`:'<div class="nota">Nessuna persona inserita nella scheda Personale.</div>'}
+    ${proprie?`<div class="lbl" style="margin-top:6px">Solo di questa sede</div><div style="display:flex;flex-direction:column;gap:6px">${proprie}</div>`:''}
+    <div class="lbl" style="margin-top:6px">Nuova persona solo di questa sede</div>
+    <div class="cols">${campo('Cognome','d.cognome',{ph:'Cognome'})}${campo('Nome','d.nome',{ph:'Nome'})}</div>
+    <div><div class="lbl" style="margin-bottom:6px">Mansioni</div>${multi('d.mansioni',MANSIONI)}</div>
+    ${campo('Ruolo (testo libero)','d.ruolo',{ph:'Se vuoto, si usano le mansioni',list:'mansioni'})}
+    <button class="btn sec" style="color:#123A7A;border-color:#CFC29E" data-act="salva-sede-pers">Aggiungi persona alla sede</button>
+  </div>
+  <button class="btn" data-act="salva-sede">Salva sede</button>`;
+}
+function vSedeTratt(){
+  const sd=S.sedi[SIDX];if(!sd)return vSedi();
+  return `${testa('Trattamenti · '+esc(t(sd.nome)),'','sede')}
+  <div class="nota">Partono come la sede principale. Cambia solo ciò che è diverso: nel file esce solo la differenza.</div>
+  <div style="display:flex;flex-direction:column;gap:12px">${blocchiTratt()}</div>
+  <button class="btn" data-act="vai" data-v="sede">Salva</button>`;
 }
 function vCondividi(){
   const c=controlli();
@@ -373,35 +444,68 @@ function vCondividi(){
   ${window.showDirectoryPicker?'<button class="btn sec" style="min-height:44px;font-size:14px" data-act="cambia-cartella">Cambia cartella</button>':''}
   <div class="dopo"><b>Dopo l'invio</b><p>Elimina i file da chat e posta dopo l'importazione nell'app. Su WhatsApp usa i messaggi temporanei.</p><button class="btn peric" data-act="svuota">Svuota dati dal telefono</button></div>`;
 }
-const VISTE={home:vHome,struttura:vStruttura,dpo:vDpo,soggetti:vSoggetti,personale:vPersonale,trattamenti:vTrattamenti,opzioni:vOpzioni,condividi:vCondividi};
+const VISTE={home:vHome,struttura:vStruttura,dpo:vDpo,soggetti:vSoggetti,personale:vPersonale,trattamenti:vTrattamenti,sedi:vSedi,sede:vSede,sede_tratt:vSedeTratt,opzioni:vOpzioni,condividi:vCondividi};
 function render(keep){
   const y=window.scrollY;
   document.getElementById('app').innerHTML=VISTE[VIEW]()+`<datalist id="mansioni">${MANSIONI.map(m=>`<option value="${esc(m[1])}">`).join('')}</datalist>`;
   window.scrollTo(0,keep?y:0);
 }
+const scollegaPers=p=>{const k=keyP(p);S.sedi.forEach(sd=>{sd.pers_rif=sd.pers_rif.filter(x=>x!==k);});};
+function chiudiSede(){const sd=S.sedi[SIDX];if(sd&&!t(sd.nome)){S.sedi.splice(SIDX,1);SIDX=null;toast('Sede senza nome non salvata');}}
 function vai(v){VIEW=v;D=nuovaBozza(v);IDX=null;render();}
 function nuovaBozza(v){
-  if(v==='soggetti')return {ruolo:'',tipo:'giuridica',nome:'',indirizzo:'',mansione:'',credenziali:'',ambiti:'',cf:'',piva:'',categorie:[]};
-  if(v==='personale')return {cognome:'',nome:'',ruolo:'',mansioni:[],email:'',codice_fiscale:'',note:''};
+  if(v==='soggetti')return {ruolo:'',tipo:'giuridica',nome:'',indirizzo:'',mansione:'',credenziali:'',ambiti:'',cf:'',piva:'',categorie:[],mansioni:[]};
+  if(v==='personale'||v==='sede')return {cognome:'',nome:'',ruolo:'',mansioni:[],email:'',codice_fiscale:'',note:''};
   return {};
 }
 
 /* ================= Esportazione ================= */
 const base=()=>`${slug(S.struttura.ragione_sociale)}_${S.struttura.data_documenti||oggi()}`;
 const dataIt=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?`${m[3]}/${m[2]}/${m[1]}`:'';};
-function trattamentiExp(){
-  const est=S.struttura.profilo==='medicina_estetica',out={};
-  TRATT.forEach(([n,,ops])=>{
-    const x=S.trattamenti[n];if(!x)return;
-    if(!x.attivo){out[n]={attivo:false};return;}
-    const r={attivo:true};
-    ops.forEach(([k,,def,solo])=>{if(solo&&solo==='medicina_estetica'&&!est)return;if(k in x)r[k]=!!x[k];else if(def)r[k]=true;});
-    out[n]=r;
+function esportaN(n,x,prof){
+  const ops=TRATT.find(r=>r[0]===n)[2];
+  if(!x.attivo)return {attivo:false};
+  const g=mkG(n,x),r={attivo:true};
+  ops.forEach(([k,,def])=>{
+    if(n==='pazienti'&&prof==='medicina_lavoro'){
+      if(['marketing','foto_ulteriori','minorenni','dermatologia'].includes(k)){r[k]=false;return;}
+      if(k==='lavoro'){r[k]=true;return;}
+    }
+    if(!optVisibile(n,k,prof,g))return;
+    if(k in x)r[k]=!!x[k];else if(def)r[k]=true;
+  });
+  return r;
+}
+function esportaTratt(map,prof){const out={};TRATT.forEach(([n])=>{const x=map[n];if(!x)return;out[n]=esportaN(n,x,prof);});return out;}
+const trattamentiExp=()=>esportaTratt(S.trattamenti,S.struttura.profilo);
+function diffTratt(eS,eP){
+  const out={};
+  Object.keys(eS).forEach(n=>{
+    const a=eS[n],b=eP[n];
+    if(!b){out[n]=a;return;}
+    const d={};let any=a.attivo!==b.attivo;
+    Object.keys(a).forEach(k=>{if(k!=='attivo'&&a[k]!==b[k]){d[k]=a[k];any=true;}});
+    if(any)out[n]={attivo:a.attivo,...d};
   });
   return out;
 }
+const effMap=sd=>{const m={};TRATT.forEach(([n])=>{const b=S.trattamenti[n],o=sd.trattamenti[n];if(b||o)m[n]={...(b||{}),...(o||{})};});return m;};
+const persExp=p=>{const m=(p.mansioni||[]).slice();return {nome:keyP(p),ruolo:t(p.ruolo)||m.map(k=>MANSIONE_L[k]).filter(Boolean).join(', '),mansioni:m,email:t(p.email),cf:t(p.codice_fiscale).toUpperCase(),note:t(p.note)};};
+function sediExp(){
+  const eP=trattamentiExp();
+  return S.sedi.filter(x=>t(x.nome)).map(x=>{
+    const o={nome:t(x.nome),indirizzo:t(x.indirizzo),cap:t(x.cap),comune:t(x.comune),provincia:t(x.provincia).toUpperCase(),telefono:t(x.telefono),email:t(x.email)};
+    if(x.profilo&&x.profilo!==S.struttura.profilo)o.profilo=x.profilo;
+    const tr=diffTratt(esportaTratt(effMap(x),profiloDi(x)),eP);
+    if(Object.keys(tr).length)o.trattamenti=tr;
+    const pers=[...x.pers_rif.map(k=>S.personale.find(p=>keyP(p)===k)).filter(Boolean),...x.personale].map(persExp);
+    if(pers.length)o.personale=pers;
+    return o;
+  });
+}
 function costruisci(){
   const s=S.struttura,d=S.dpo;
+  const sedi=sediExp();
   const dpo=d.presente
     ?{attivo:true,origine:d.tipo,tipo:d.natura,nome:t(d.nome_denominazione),cf:d.tipo==='esterno'?t(d.codice_fiscale).toUpperCase():'',piva:d.tipo==='esterno'?t(d.partita_iva).replace(/\s/g,''):'',sede:d.tipo==='esterno'?t(d.sede):'',telefono:t(d.telefono),email:t(d.email)}
     :{attivo:false};
@@ -412,15 +516,13 @@ function costruisci(){
     soggetti:S.soggetti.map(x=>{
       const o={ruolo:x.ruolo,tipo:x.tipo||'giuridica',nome:t(x.nome),cf:t(x.cf).toUpperCase(),piva:t(x.piva).replace(/\s/g,''),indirizzo:t(x.indirizzo),mansione:t(x.mansione)};
       if(SEZIONI_ACCESSO.includes(x.ruolo)){o.credenziali=x.credenziali||'';o.ambiti=t(x.ambiti);}
-      if(x.ruolo==='responsabile')o.categorie=(x.categorie||[]).slice();
+      if(x.ruolo==='responsabile'){o.categorie=(x.categorie||[]).slice();if(o.categorie.includes('professionista_sanitario')&&(x.mansioni||[]).length)o.mansioni=x.mansioni.slice();}
       return o;
     }),
-    personale:S.personale.map(p=>{
-      const m=(p.mansioni||[]).slice();
-      return {nome:[t(p.cognome),t(p.nome)].filter(Boolean).join(' '),ruolo:t(p.ruolo)||m.map(k=>MANSIONE_L[k]).filter(Boolean).join(', '),mansioni:m,email:t(p.email),cf:t(p.codice_fiscale).toUpperCase(),note:t(p.note)};
-    }),
+    personale:S.personale.map(persExp),
     opzioni:Object.fromEntries(OPZIONI.map(([k])=>[OPZ_EXP[k],!!S.opzioni[k]])),
-    trattamenti:trattamentiExp()
+    trattamenti:trattamentiExp(),
+    ...(sedi.length?{sedi}:{})
   };
 }
 async function sha256(txt){
@@ -460,6 +562,17 @@ function creaPdf(){
   titolo('Trattamenti');
   if(!Object.keys(o.trattamenti).length)riga('Trattamenti','Nessuna impostazione (restano quelle del profilo)');
   TRATT.forEach(([n,l,ops])=>{const x=o.trattamenti[n];if(!x)return;if(!x.attivo){riga(l,'Non attivo');return;}const att=ops.filter(([k])=>x[k]).map(([,lb])=>lb);riga(l,'Attivo'+(att.length?': '+att.join(', '):''));});
+  if(o.sedi&&o.sedi.length){
+    titolo('Sedi ulteriori ('+o.sedi.length+')');
+    o.sedi.forEach(x=>{
+      riga('Sede',x.nome);riga('  Indirizzo',[x.indirizzo,[[x.cap,x.comune].filter(Boolean).join(' '),x.provincia&&'('+x.provincia+')'].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+      riga('  Telefono',x.telefono);riga('  E-mail',x.email);
+      if(x.profilo)riga('  Profilo',(PROFILI.find(p=>p[0]===x.profilo)||['',''])[1]);
+      Object.keys(x.trattamenti||{}).forEach(n=>{const r=TRATT.find(q=>q[0]===n);const t2=x.trattamenti[n];riga('  '+(r?r[1]:n),t2.attivo?'Attivo: '+Object.keys(t2).filter(k=>k!=='attivo'&&t2[k]).map(k=>{const op=r&&r[2].find(z=>z[0]===k);return op?op[1]:k;}).join(', '):'Non attivo');});
+      if(x.personale&&x.personale.length)riga('  Personale',x.personale.map(p=>p.nome).join(', '));
+      y+=1.5;
+    });
+  }
   return doc.output('blob');
 }
 async function logoFile(){
@@ -513,14 +626,14 @@ function riduciLogo(file){
 }
 
 /* ================= Eventi ================= */
-document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;let v=e.target.value;if(e.target.hasAttribute('autocapitalize')&&e.target.autocapitalize==='characters')v=v.toUpperCase();set(k,v);if(k.startsWith('struttura.')||k.startsWith('dpo.'))salva();if(e.target.classList.contains('err')&&k==='struttura.pec'&&emailOk(v))e.target.classList.remove('err');});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;let v=e.target.value;if(e.target.hasAttribute('autocapitalize')&&e.target.autocapitalize==='characters')v=v.toUpperCase();set(k,v);if(k.startsWith('struttura.')||k.startsWith('dpo.')||k.startsWith('s.'))salva();if(e.target.classList.contains('err')&&k==='struttura.pec'&&emailOk(v))e.target.classList.remove('err');});
 document.addEventListener('change',async e=>{
   if(e.target.matches('[data-logo]')&&e.target.files[0]){S.logo=await riduciLogo(e.target.files[0]);salva();render();}
 });
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const a=b.dataset.act,k=b.dataset.k,v=b.dataset.v,i=b.dataset.i!==undefined?+b.dataset.i:null,tt=b.dataset.t,oo=b.dataset.o;
-  if(a==='vai'){salva();vai(v);}
+  if(a==='vai'){if(VIEW==='sede'&&v!=='sede_tratt')chiudiSede();salva();vai(v);}
   else if(a==='set'){
     set(k,v);
     if(k==='d.ruolo'&&VIEW==='soggetti'){if(v==='ads')D.credenziali='fisse';else if(v==='manutentore')D.credenziali='occasionali';else D.credenziali='';}
@@ -528,17 +641,20 @@ document.addEventListener('click',async e=>{
   }
   else if(a==='multi'){const arr=(get(k)||[]).slice();const j=arr.indexOf(v);if(j>=0)arr.splice(j,1);else arr.push(v);set(k,arr);render(true);}
   else if(a==='toggle'){set(k,!get(k));if(k.startsWith('opzioni.'))S.opzioni_confermate=false;salva();render(true);}
-  else if(a==='tr-att'){const x=S.trattamenti[tt]||(S.trattamenti[tt]={});x.attivo=!x.attivo;if(x.attivo){const def=TRATT.find(r=>r[0]===tt)[2];def.forEach(([ok,,d])=>{if(d&&!(ok in x))x[ok]=true;});}salva();render(true);}
-  else if(a==='tr-opt'){const def=TRATT.find(r=>r[0]===tt)[2].find(o=>o[0]===oo);const x=S.trattamenti[tt];x[oo]=!trOpt(tt,oo,def[2]);salva();render(true);}
-  else if(a==='dpo-wiseman'){
-    const nome=t(S.dpo.nome_denominazione);
-    if(nome&&nome!==WISEMAN.nome_denominazione&&!confirm('Sostituire i dati del DPO con quelli di Wiseman & Partners?'))return;
-    Object.assign(S.dpo,WISEMAN,{presente:true});salva();render(true);toast('Dati Wiseman & Partners inseriti');
-  }
-  else if(a==='tr-reset'){delete S.trattamenti[tt];salva();render(true);}
+  else if(a==='tr-att'){const sd=sedeCorrente();const cur=!!effX(tt,sd).attivo;setTr(tt,'attivo',!cur,sd);if(!cur){TRATT.find(r=>r[0]===tt)[2].forEach(([ok,,d])=>{if(d&&!(ok in effX(tt,sd)))setTr(tt,ok,true,sd);});}salva();render(true);}
+  else if(a==='tr-opt'){const sd=sedeCorrente();setTr(tt,oo,!mkG(tt,effX(tt,sd))(oo),sd);salva();render(true);}
+  else if(a==='nuova-sede'){S.sedi.push({nome:'',indirizzo:'',cap:'',comune:'',provincia:'',telefono:'',email:'',profilo:S.struttura.profilo||'',trattamenti:{},pers_rif:[],personale:[]});SIDX=S.sedi.length-1;salva();VIEW='sede';D=nuovaBozza('sede');IDX=null;render();}
+  else if(a==='edit-sede'){SIDX=i;VIEW='sede';D=nuovaBozza('sede');render();}
+  else if(a==='del-sede-l'){if(confirm('Eliminare questa sede?')){S.sedi.splice(i,1);SIDX=null;salva();render(true);}}
+  else if(a==='sede-tratt'){if(!t(S.sedi[SIDX].nome)){toast('Inserisci prima il nome della sede');return;}salva();VIEW='sede_tratt';render();}
+  else if(a==='salva-sede'){if(!t(S.sedi[SIDX].nome)){toast('Serve il nome della sede');return;}salva();vai('sedi');}
+  else if(a==='sede-pers'){const arr=S.sedi[SIDX].pers_rif,n=b.dataset.n,j=arr.indexOf(n);if(j>=0)arr.splice(j,1);else arr.push(n);salva();render(true);}
+  else if(a==='salva-sede-pers'){if(!t(D.cognome)||!t(D.nome)){toast('Servono cognome e nome');return;}S.sedi[SIDX].personale.push({...D});D=nuovaBozza('sede');salva();render(true);}
+  else if(a==='del-sede-pers'){S.sedi[SIDX].personale.splice(i,1);salva();render(true);}
+  else if(a==='tr-reset'){const sd=sedeCorrente();if(sd)delete sd.trattamenti[tt];else delete S.trattamenti[tt];salva();render(true);}
   else if(a==='dpo-rimuovi'){if(confirm('Rimuovere il DPO e cancellarne i dati?')){S.dpo=vuota().dpo;salva();render(true);toast('DPO rimosso');}}
   else if(a==='del-sogg-l'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(i,1);salva();D=nuovaBozza('soggetti');IDX=null;render(true);}}
-  else if(a==='del-pers-l'){if(confirm('Eliminare questa persona?')){S.personale.splice(i,1);salva();D=nuovaBozza('personale');IDX=null;render(true);}}
+  else if(a==='del-pers-l'){if(confirm('Eliminare questa persona?')){scollegaPers(S.personale[i]);S.personale.splice(i,1);salva();D=nuovaBozza('personale');IDX=null;render(true);}}
   else if(a==='salva-tel'){salva();salvaTelefono();}
   else if(a==='cambia-cartella'){try{await cartella(true);render(true);}catch(e){if(e&&e.name!=='AbortError')toast('Selezione cartella non disponibile');}}
   else if(a==='conferma-opz'){S.opzioni_confermate=true;salva();vai('home');}
@@ -552,11 +668,12 @@ document.addEventListener('click',async e=>{
   else if(a==='del-sogg'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(IDX,1);salva();D=nuovaBozza('soggetti');IDX=null;render();}}
   else if(a==='salva-pers'){
     if(!t(D.cognome)||(IDX===null&&!t(D.nome))){toast('Servono cognome e nome');return;}
-    if(IDX===null)S.personale.push({...D});else S.personale[IDX]={...D};
+    if(IDX===null)S.personale.push({...D});
+    else{const vecchia=keyP(S.personale[IDX]);S.personale[IDX]={...D};const nuova=keyP(D);if(vecchia!==nuova)S.sedi.forEach(sd=>{const j=sd.pers_rif.indexOf(vecchia);if(j>=0)sd.pers_rif[j]=nuova;});}
     salva();D=nuovaBozza('personale');IDX=null;render();
   }
   else if(a==='edit-pers'){IDX=i;D={...S.personale[i]};render();window.scrollTo(0,document.body.scrollHeight);}
-  else if(a==='del-pers'){if(confirm('Eliminare questa persona?')){S.personale.splice(IDX,1);salva();D=nuovaBozza('personale');IDX=null;render();}}
+  else if(a==='del-pers'){if(confirm('Eliminare questa persona?')){scollegaPers(S.personale[IDX]);S.personale.splice(IDX,1);salva();D=nuovaBozza('personale');IDX=null;render();}}
   else if(a==='annulla'){D=nuovaBozza(VIEW);IDX=null;render();}
   else if(a==='share'){salva();condividi();}
   else if(a==='svuota'){if(confirm('Cancellare dal telefono TUTTI i dati di questa scheda? Assicurati di averla già inviata.')){localStorage.removeItem(KEY);S=vuota();D={};IDX=null;VIEW='home';render();toast('Dati cancellati da questo telefono');}}

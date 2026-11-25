@@ -440,7 +440,10 @@ function vCondividi(){
   <div class="spazio"></div>
   ${bloccante()?'<div class="avviso err">Manca la ragione sociale: inseriscila nella Struttura.</div>':''}
   <button class="btn" data-act="share" ${bloccante()?'disabled':''}>Condividi (email, WhatsApp…)</button>
-  <button class="btn sec" data-act="salva-tel" ${bloccante()?'disabled':''}>Salva sul telefono</button>
+  <div class="cols"><button class="btn sec" style="flex:1" data-act="salva-uno" data-v="json" ${bloccante()?'disabled':''}>Salva JSON</button><button class="btn sec" style="flex:1" data-act="salva-uno" data-v="pdf" ${bloccante()?'disabled':''}>Salva PDF</button></div>
+  ${S.logo?`<button class="btn sec" data-act="salva-uno" data-v="logo" ${bloccante()?'disabled':''}>Salva logo</button>`:''}
+  ${window.showDirectoryPicker?`<button class="btn sec" data-act="salva-tel" ${bloccante()?'disabled':''}>Salva tutto nella cartella</button>`:''}
+  ${ULTIMO?`<div class="nota">Se il download non è partito: <a style="color:var(--avorio-testo);font-weight:700" href="${ULTIMO.url}" download="${esc(ULTIMO.nome)}">tocca qui per scaricare ${esc(ULTIMO.nome)}</a></div>`:''}
   <div class="nota">Cartella: ${esc(cartellaNome()||'Download')}${window.showDirectoryPicker?'':' · per sceglierla ogni volta: Chrome → Impostazioni → Download → «Chiedi dove salvare i file»'}</div>
   ${window.showDirectoryPicker?'<button class="btn sec" style="min-height:44px;font-size:14px" data-act="cambia-cartella">Cambia cartella</button>':''}
   <div class="dopo"><b>Dopo l'invio</b><p>Elimina i file da chat e posta dopo l'importazione nell'app. Su WhatsApp usa i messaggi temporanei.</p><button class="btn peric" data-act="svuota">Svuota dati dal telefono</button></div>`;
@@ -659,14 +662,41 @@ async function prepara(){
   const files=[json,pdf];const lg=await logoFile();if(lg)files.push(lg);
   return files;
 }
-function scarica(files){files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*400));}
+function scarica(files){files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*1500));}
+const trovaF=(fs,pre)=>fs.find(f=>f.name.startsWith(pre));
 async function condividi(){
   try{
     const files=await prepara();
-    if(navigator.canShare&&navigator.canShare({files})){
-      await navigator.share({files,title:'Scheda cliente',text:'Scheda cliente'});
-    }else{scarica(files);toast('Condivisione non disponibile: file scaricati');}
-  }catch(e){if(e&&e.name!=='AbortError')toast('Errore: '+(e.message||e));}
+    /* Chrome su Android rifiuta i file JSON nel menu Condividi ("Permission denied"): si invia come testo .json.txt */
+    const jf=trovaF(files,'scheda_');
+    const da=/Android/i.test(navigator.userAgent);
+    const lista=da?files.map(f=>f===jf?new File([f],f.name+'.txt',{type:'text/plain'}):f):files;
+    if(navigator.canShare&&navigator.canShare({files:lista})){
+      await navigator.share({files:lista,title:'Scheda cliente',text:'Scheda cliente'});
+      if(da)toast('JSON inviato come .json.txt: il contenuto è identico',5000);
+    }else{toast('Condivisione non disponibile: usa Salva JSON e Salva PDF',5000);}
+  }catch(e){
+    if(e&&e.name==='AbortError')return;
+    toast('Condivisione non riuscita ('+(e.message||e)+'). Usa Salva JSON e Salva PDF.',6000);
+  }
+}
+let ULTIMO=null;     // ultimo file preparato per il download (link di riserva)
+function scaricaUno(f){
+  if(ULTIMO)URL.revokeObjectURL(ULTIMO.url);
+  ULTIMO={nome:f.name,url:URL.createObjectURL(f)};
+  const a=document.createElement('a');a.href=ULTIMO.url;a.download=f.name;document.body.appendChild(a);a.click();a.remove();
+}
+async function salvaUno(tipo){
+  try{
+    let dir=null;
+    try{dir=await cartella(false);}catch(e){if(e&&e.name==='AbortError')return;dir=null;}
+    const files=await prepara();
+    const f=tipo==='json'?trovaF(files,'scheda_'):tipo==='pdf'?trovaF(files,'riepilogo_'):trovaF(files,'logo_');
+    if(!f){toast('File non disponibile');return;}
+    if(dir){const fh=await dir.getFileHandle(f.name,{create:true});const w=await fh.createWritable();await w.write(f);await w.close();toast('Salvato '+f.name+' in «'+dir.name+'»',5000);}
+    else{scaricaUno(f);toast('Download avviato: '+f.name+'. Se non compare, tocca il link in basso.',6000);}
+    render(true);
+  }catch(e){toast('Errore: '+(e.message||e));}
 }
 /* Salva sul telefono: cartella scelta (se il browser lo permette) oppure Download */
 const cartellaNome=()=>{try{return localStorage.getItem('scheda_cartella')||'';}catch(e){return '';}};
@@ -729,6 +759,7 @@ document.addEventListener('click',async e=>{
   else if(a==='del-sogg-l'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(i,1);salva();D=nuovaBozza('soggetti');IDX=null;render(true);}}
   else if(a==='del-pers-l'){if(confirm('Eliminare questa persona?')){scollegaPers(S.personale[i]);S.personale.splice(i,1);salva();D=nuovaBozza('personale');IDX=null;render(true);}}
   else if(a==='salva-tel'){salva();salvaTelefono();}
+  else if(a==='salva-uno'){salva();salvaUno(v);}
   else if(a==='cambia-cartella'){try{await cartella(true);render(true);}catch(e){if(e&&e.name!=='AbortError')toast('Selezione cartella non disponibile');}}
   else if(a==='conferma-opz'){S.opzioni_confermate=true;salva();vai('home');}
   else if(a==='logo-del'){S.logo=null;salva();render();}

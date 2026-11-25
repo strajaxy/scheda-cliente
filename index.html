@@ -224,7 +224,7 @@ const slug=s=>t(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace
 function ref(path){const p=path.split('.');let o=S;if(p[0]==='d'){o=D;p.shift();}else if(p[0]==='s'){o=S.sedi[SIDX];p.shift();}for(let i=0;i<p.length-1;i++)o=o[p[i]];return [o,p[p.length-1]];}
 const get=path=>{const [o,k]=ref(path);return o[k];};
 const set=(path,v)=>{const [o,k]=ref(path);o[k]=v;};
-let toastT;function toast(m){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>e.style.display='none',3200);}
+let toastT;function toast(m,ms){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>e.style.display='none',ms||3200);}
 
 /* ================= Componenti ================= */
 const icoBack='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3A3F8C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
@@ -280,6 +280,7 @@ function vHome(){
   const riga=(v,n,d,[c,l])=>`<button class="riga" data-act="vai" data-v="${v}"><span class="t"><b>${n}</b><span>${d}</span></span><span class="chip ${c}">${l}</span></button>`;
   return `<div class="pill"><i></i>Offline · dati solo su questo telefono</div>
   <div><h1>Scheda cliente</h1><div class="sub">${esc(t(s.ragione_sociale)||'[Ragione sociale]')} · visita del ${esc(s.data_documenti)}</div></div>
+  <label class="btn sec" style="cursor:pointer">Apri scheda esistente<input type="file" accept=".json,application/json,application/octet-stream,text/plain" data-apri style="display:none"></label>
   <div style="display:flex;flex-direction:column;gap:10px">
   ${riga('struttura','Struttura','Dati, PEC e profilo',strutt)}
   ${riga('dpo','DPO',S.dpo.presente?'Nominato ('+S.dpo.tipo+')':'Facoltativo · non nominato',dpo)}
@@ -525,6 +526,77 @@ function costruisci(){
     ...(sedi.length?{sedi}:{})
   };
 }
+/* ================= Apri scheda esistente (JSON della scheda o del gestionale) ================= */
+const sOf=v=>typeof v==='string'?v:(v==null||typeof v==='object'?'':String(v));
+const isoDa=d=>{const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(d||'').trim());return m?`${m[3]}-${m[2]}-${m[1]}`:'';};
+function leggiTr(src,tr,ign){
+  if(!src||typeof src!=='object')return;
+  Object.keys(src).forEach(n=>{
+    const def=TRATT.find(r=>r[0]===n);
+    if(!def||!src[n]||typeof src[n]!=='object'){ign.n++;return;}
+    const r={},x=src[n];
+    if(typeof x.attivo==='boolean')r.attivo=x.attivo;
+    def[2].forEach(([k])=>{if(typeof x[k]==='boolean')r[k]=x[k];});
+    if(Object.keys(r).length)tr[n]=r;
+  });
+}
+function daJson(o){
+  const st=vuota(),ign={n:0},v=sOf;
+  const so=o.struttura||{};
+  const sx=st.struttura;
+  sx.ragione_sociale=v(so.titolare);sx.partita_iva=v(so.piva);sx.indirizzo=v(so.indirizzo);sx.cap=v(so.cap);sx.comune=v(so.comune);sx.provincia=v(so.provincia);sx.telefono=v(so.telefono);sx.email=v(so.email);sx.pec=v(so.pec);
+  sx.profilo=PROFILI.some(p=>p[0]===so.profilo)?so.profilo:'';
+  sx.data_documenti=isoDa(so.data)||S.struttura.data_documenti||oggi();
+  const d=o.dpo;
+  if(d&&d.attivo===true){Object.assign(st.dpo,{presente:true,tipo:d.origine==='interno'?'interno':'esterno',natura:d.tipo==='fisica'?'fisica':'giuridica',nome_denominazione:v(d.nome),codice_fiscale:v(d.cf),partita_iva:v(d.piva),sede:v(d.sede),telefono:v(d.telefono),email:v(d.email)});}
+  (Array.isArray(o.soggetti)?o.soggetti:[]).forEach(x=>{
+    if(!x||!RUOLO_L[x.ruolo]||!t(v(x.nome))){ign.n++;return;}
+    st.soggetti.push({ruolo:x.ruolo,tipo:x.tipo==='fisica'?'fisica':'giuridica',nome:v(x.nome),indirizzo:v(x.indirizzo),mansione:v(x.mansione),credenziali:['fisse','occasionali'].includes(x.credenziali)?x.credenziali:'',ambiti:v(x.ambiti),cf:v(x.cf),piva:v(x.piva),categorie:(Array.isArray(x.categorie)?x.categorie:[]).filter(k=>CATEGORIA_L[k]),mansioni:(Array.isArray(x.mansioni)?x.mansioni:[]).filter(k=>MANSIONE_L[k])});
+  });
+  const pers=x=>({cognome:v(x.nome),nome:'',ruolo:v(x.ruolo),mansioni:(Array.isArray(x.mansioni)?x.mansioni:[]).filter(k=>MANSIONE_L[k]),email:v(x.email),codice_fiscale:v(x.cf),note:v(x.note)});
+  (Array.isArray(o.personale)?o.personale:[]).forEach(x=>{if(!x||!t(v(x.nome))){ign.n++;return;}st.personale.push(pers(x));});
+  if(o.opzioni&&typeof o.opzioni==='object'){
+    OPZIONI.forEach(([k])=>{st.opzioni[k]=o.opzioni[OPZ_EXP[k]]===true;});
+    st.opzioni_confermate=true;
+  }
+  leggiTr(o.trattamenti,st.trattamenti,ign);
+  (Array.isArray(o.sedi)?o.sedi:[]).forEach(x=>{
+    if(!x||!t(v(x.nome))){ign.n++;return;}
+    const sd={nome:v(x.nome),indirizzo:v(x.indirizzo),cap:v(x.cap),comune:v(x.comune),provincia:v(x.provincia),telefono:v(x.telefono),email:v(x.email),profilo:PROFILI.some(p=>p[0]===x.profilo)?x.profilo:sx.profilo,trattamenti:{},pers_rif:[],personale:[]};
+    leggiTr(x.trattamenti,sd.trattamenti,ign);
+    (Array.isArray(x.personale)?x.personale:[]).forEach(q=>{
+      if(!q||!t(v(q.nome))){ign.n++;return;}
+      const np=pers(q),k=keyP(np);
+      if(st.personale.some(a=>keyP(a)===k)){if(!sd.pers_rif.includes(k))sd.pers_rif.push(k);}else sd.personale.push(np);
+    });
+    st.sedi.push(sd);
+  });
+  const parti=[];
+  if(t(sx.ragione_sociale))parti.push('Struttura');
+  if(st.dpo.presente)parti.push('DPO');
+  if(st.soggetti.length)parti.push(st.soggetti.length+(st.soggetti.length===1?' soggetto':' soggetti'));
+  if(st.personale.length)parti.push(st.personale.length+(st.personale.length===1?' persona':' persone'));
+  if(Object.keys(st.trattamenti).length)parti.push('trattamenti');
+  if(st.sedi.length)parti.push(st.sedi.length+(st.sedi.length===1?' sede':' sedi'));
+  return {st,msg:'Caricati: '+(parti.join(', ')||'nessun dato')+(ign.n?` · ${ign.n} voci ignorate`:'')+'. Il logo va aggiunto a mano.'};
+}
+async function verificaChecksum(o){
+  if(typeof o.checksum!=='string'||!o.checksum.startsWith('sha256:'))return true;
+  const c={...o};delete c.checksum;
+  const h=await sha256(JSON.stringify(c));
+  return !h||('sha256:'+h===o.checksum);
+}
+async function apriFile(f){
+  let o;
+  try{o=JSON.parse(await f.text());}catch(e){toast('File non leggibile: non è un JSON valido');return;}
+  if(!o||typeof o!=='object'||!['wiseman-scheda-cliente','scheda-cliente'].includes(o.schema)||!o.struttura||typeof o.struttura!=='object'){toast('File non riconosciuto come scheda cliente');return;}
+  if(typeof o.versione==='number'&&o.versione>VERSIONE&&!confirm('Il file è stato creato con una versione più recente: alcuni dati potrebbero non essere letti. Aprirlo comunque?'))return;
+  if(!(await verificaChecksum(o))&&!confirm('Il file risulta modificato dopo l\'esportazione. Aprirlo comunque?'))return;
+  const ha=t(S.struttura.ragione_sociale)||S.soggetti.length||S.personale.length||S.sedi.length||Object.keys(S.trattamenti).length;
+  if(ha&&!confirm('Sostituire i dati attuali della scheda con quelli del file?'))return;
+  const r=daJson(o);
+  S=r.st;salva();D={};IDX=null;SIDX=null;VIEW='home';render();toast(r.msg,6500);
+}
 async function sha256(txt){
   if(!(window.crypto&&crypto.subtle))return null;
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));
@@ -628,6 +700,7 @@ function riduciLogo(file){
 /* ================= Eventi ================= */
 document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;let v=e.target.value;if(e.target.hasAttribute('autocapitalize')&&e.target.autocapitalize==='characters')v=v.toUpperCase();set(k,v);if(k.startsWith('struttura.')||k.startsWith('dpo.')||k.startsWith('s.'))salva();if(e.target.classList.contains('err')&&k==='struttura.pec'&&emailOk(v))e.target.classList.remove('err');});
 document.addEventListener('change',async e=>{
+  if(e.target.matches('[data-apri]')&&e.target.files[0]){const f=e.target.files[0];e.target.value='';await apriFile(f);return;}
   if(e.target.matches('[data-logo]')&&e.target.files[0]){S.logo=await riduciLogo(e.target.files[0]);salva();render();}
 });
 document.addEventListener('click',async e=>{
@@ -679,7 +752,7 @@ document.addEventListener('click',async e=>{
   else if(a==='svuota'){if(confirm('Cancellare dal telefono TUTTI i dati di questa scheda? Assicurati di averla già inviata.')){localStorage.removeItem(KEY);S=vuota();D={};IDX=null;VIEW='home';render();toast('Dati cancellati da questo telefono');}}
 });
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
-window.__test={get S(){return S;},set S(x){S=x;},costruisci,creaJson,creaPdf,render,vai,controlli};
+window.__test={get S(){return S;},set S(x){S=x;},apriFile,daJson,costruisci,creaJson,creaPdf,render,vai,controlli};
 render();
 </script>
 </body>

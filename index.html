@@ -127,7 +127,7 @@ const oggi=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOSt
 const vuota=()=>({
   v:2,
   struttura:{ragione_sociale:'',partita_iva:'',indirizzo:'',cap:'',comune:'',provincia:'',telefono:'',email:'',pec:'',profilo:'',data_documenti:oggi()},
-  dpo:{presente:false,tipo:'esterno',natura:'giuridica',nome_denominazione:'',codice_fiscale:'',partita_iva:'',sede:'',telefono:'',email:''},
+  dpo:{presente:false,tipo:'esterno',natura:'giuridica',nome_denominazione:'',cognome:'',nome:'',codice_fiscale:'',partita_iva:'',sede:'',telefono:'',email:''},
   soggetti:[],personale:[],
   opzioni:{smartphone_tablet:false,chiavette_internet:false,accordo_sindacati:false},
   trattamenti:{},
@@ -158,7 +158,9 @@ function migra(s){
   }
   s.v=2;
 }
-migra(S);try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+migra(S);
+if(S.dpo.tipo==='interno'&&!S.dpo.cognome&&!S.dpo.nome&&S.dpo.nome_denominazione){S.dpo.cognome=S.dpo.nome_denominazione;S.dpo.nome='';}
+try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
 let VIEW='home';
 let D={};            // bozza (soggetto/persona in modifica), solo in memoria
 let IDX=null;        // indice in modifica
@@ -245,13 +247,14 @@ const multi=(path,opts)=>`<div class="scelte pill-s" role="group">${opts.map(([v
 const interr=(lbl,path)=>`<button type="button" class="sw" role="switch" aria-checked="${!!get(path)}" data-act="toggle" data-k="${path}"><span class="t">${lbl}</span><span class="b"></span></button>`;
 
 /* ================= Controlli ================= */
+const dpoNome=d=>d.tipo==='interno'?[String(d.cognome||'').trim(),String(d.nome||'').trim()].filter(Boolean).join(' '):String(d.nome_denominazione||'').trim();
 function controlli(){
   const s=S.struttura,c=[];
   c.push(t(s.ragione_sociale)?[1,'Ragione sociale presente']:[0,'Ragione sociale mancante']);
   c.push(emailOk(t(s.pec))?[1,'PEC presente']:[0,'PEC mancante o non valida (obbligatoria per la procedura di data breach)']);
   c.push(s.profilo?[1,'Profilo: '+(PROFILI.find(p=>p[0]===s.profilo)||[0,''])[1]]:[0,'Profilo non scelto']);
   if(t(s.partita_iva)&&!pivaOk(s.partita_iva))c.push([0,'Partita IVA: servono 11 cifre']);
-  if(S.dpo.presente)c.push(t(S.dpo.nome_denominazione)?[1,'DPO '+S.dpo.tipo+': '+t(S.dpo.nome_denominazione)]:[0,'DPO nominato ma senza nominativo']);
+  if(S.dpo.presente)c.push(dpoNome(S.dpo)?[1,'DPO '+S.dpo.tipo+': '+dpoNome(S.dpo)]:[0,'DPO nominato ma senza nominativo']);
   else c.push([1,'DPO non nominato (nessun riferimento nei documenti)']);
   c.push([1,`Soggetti: ${S.soggetti.length} inseriti`]);
   c.push([1,`Trattamenti: ${Object.keys(S.trattamenti).length} impostati`]);
@@ -269,7 +272,7 @@ const bloccante=()=>!t(S.struttura.ragione_sociale);
 function vHome(){
   const s=S.struttura;
   const strutt=t(s.ragione_sociale)&&emailOk(t(s.pec))&&s.profilo?['ok','Completa']:(t(s.ragione_sociale)?['wip','In corso']:['todo','Da fare']);
-  const dpo=S.dpo.presente?(t(S.dpo.nome_denominazione)?['ok','Compilato']:['wip','In corso']):['todo','Facoltativo'];
+  const dpo=S.dpo.presente?(dpoNome(S.dpo)?['ok','Compilato']:['wip','In corso']):['todo','Facoltativo'];
   const sog=S.soggetti.length?['wip',S.soggetti.length+' inseriti']:['todo','Da fare'];
   const per=S.personale.length?['wip',S.personale.length+' persone']:['todo','Da fare'];
   const opz=S.opzioni_confermate?['ok','Confermate']:['todo','Da fare'];
@@ -316,10 +319,10 @@ function vDpo(){
   if(d.presente){
     corpo=`<div><div class="lbl" style="margin-bottom:6px">Tipo</div>${scelta('dpo.tipo',[['interno','Interno'],['esterno','Esterno']])}</div>
     <div><div class="lbl" style="margin-bottom:6px">Natura</div>${scelta('dpo.natura',[['fisica','Persona fisica'],['giuridica','Persona giuridica']])}</div>
-    ${campo('Nome o denominazione','dpo.nome_denominazione',{ph:'Nome o denominazione'})}
+    ${d.tipo==='interno'?`<div class="cols">${campo('Cognome','dpo.cognome',{ph:'Cognome'})}${campo('Nome','dpo.nome',{ph:'Nome'})}</div>${campo('Codice fiscale','dpo.codice_fiscale',{up:1,ph:'Codice fiscale'})}`:campo('Nome o denominazione','dpo.nome_denominazione',{ph:'Nome o denominazione'})}
     ${d.tipo==='esterno'?`${campo('Codice fiscale','dpo.codice_fiscale',{up:1,ph:'Codice fiscale'})}${campo('Partita IVA','dpo.partita_iva',{im:'numeric',ph:'11 cifre'})}${campo('Sede','dpo.sede',{ph:'Indirizzo della sede'})}`:''}
     <div class="cols">${campo('Telefono','dpo.telefono',{type:'tel',ph:'+39'})}${campo('E-mail','dpo.email',{type:'email',im:'email',ph:'nome@dominio.it'})}</div>
-    ${d.tipo==='interno'?'<div class="avviso oro">DPO interno: bastano nominativo e contatti.</div>':''}`;
+    ${d.tipo==='interno'?'<div class="avviso oro">DPO interno: cognome, nome, codice fiscale e contatti.</div>':''}`;
   }
   return `${testa('DPO')}
   ${interr('DPO nominato','dpo.presente')}
@@ -337,10 +340,11 @@ function vSoggetti(){
   <div class="card"><h2>${IDX===null?'Nuovo soggetto':'Modifica soggetto'}</h2>
     <div><div class="lbl" style="margin-bottom:6px">Ruolo</div>${scelta('d.ruolo',RUOLI,'pill-s')}</div>
     ${D.ruolo==='responsabile'?`<div><div class="lbl" style="margin-bottom:6px">Categorie</div>${multi('d.categorie',CATEGORIE)}</div>`:''}
-    ${D.ruolo==='responsabile'&&(D.categorie||[]).includes('professionista_sanitario')?`<div><div class="lbl" style="margin-bottom:6px">Mansioni</div>${multi('d.mansioni',MANS_SANITARIE)}</div>`:''}
+    <div><div class="lbl" style="margin-bottom:6px">Mansioni</div>${multi('d.mansioni',MANSIONI)}</div>
     <div><div class="lbl" style="margin-bottom:6px">Natura</div>${scelta('d.tipo',[['fisica','Persona fisica'],['giuridica','Persona giuridica']])}</div>
     ${campo(D.tipo==='fisica'?'Nome e cognome':'Denominazione','d.nome',{ph:D.tipo==='fisica'?'Nome e cognome':'Denominazione'})}
     ${campo('Indirizzo','d.indirizzo',{ph:'Via e numero civico'})}
+    <div class="cols">${campo('Telefono','d.telefono',{type:'tel',ph:'Facoltativo'})}${campo('E-mail','d.email',{type:'email',im:'email',ph:'Facoltativo'})}</div>
     ${campo('Mansione','d.mansione',{ph:'Es. tecnico informatico',list:'mansioni'})}
     ${acc?`<div><div class="lbl" style="margin-bottom:6px">Credenziali</div>${scelta('d.credenziali',[['fisse','Fisse'],['occasionali','Occasionali']])}<div class="nota" style="margin-top:4px">Proposto: fisse per l'amministratore di sistema, occasionali per il manutentore.</div></div>${campo('Ambiti di intervento','d.ambiti',{ph:'Es. server, gestionale, rete'})}`:''}
     ${campo('Codice fiscale','d.cf',{up:1,ph:'Facoltativo',tag:'FACOLTATIVO'})}
@@ -431,19 +435,19 @@ function vCondividi(){
   const nome=base();
   return `${testa('Fine visita')}
   <div class="ctl"><b style="font-size:14px;color:var(--indaco-scuro)">Controllo prima dell'invio</b>${c.map(([ok,tx])=>`<div style="color:${ok?'var(--celadon)':'var(--vermilio)'}"><i style="background:currentColor"></i><span>${esc(tx)}</span></div>`).join('')}</div>
-  <div style="display:flex;flex-direction:column;gap:8px"><div class="lbl">Verranno inviati insieme</div>
-    <div class="file"><div class="s" style="background:var(--indaco-chiaro);color:var(--indaco)">JSON</div><div><div class="n">scheda_${esc(nome)}.json</div><div class="nota">Importabile nell'app · con controllo di integrità</div></div></div>
-    <div class="file"><div class="s" style="background:var(--oro-chiaro);color:var(--oro)">PDF</div><div><div class="n">riepilogo_${esc(nome)}.pdf</div><div class="nota">Leggibile da chiunque, senza l'app</div></div></div>
-    ${S.logo?`<div class="file"><div class="s" style="background:var(--celadon-chiaro);color:var(--celadon)">LOGO</div><div><div class="n">logo_${esc(nome)}.png</div><div class="nota">Facoltativo</div></div></div>`:''}
+  <div><div class="lbl" style="margin-bottom:6px">Cosa vuoi salvare o inviare</div><div class="scelte pill-s" role="group">${[['json','Solo JSON'],['pdf','Solo PDF'],['tutti','Tutti e due']].map(([v,l])=>`<button type="button" class="scelta ${SCELTA===v?'on':''}" aria-pressed="${SCELTA===v}" data-act="scelta-file" data-v="${v}">${l}</button>`).join('')}</div></div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    ${SCELTA!=='pdf'?`<div class="file"><div class="s" style="background:var(--indaco-chiaro);color:var(--indaco)">JSON</div><div><div class="n">scheda_${esc(nome)}.json</div><div class="nota">Importabile nell'app · con controllo di integrità</div></div></div>`:''}
+    ${SCELTA!=='json'?`<div class="file"><div class="s" style="background:var(--oro-chiaro);color:var(--oro)">PDF</div><div><div class="n">riepilogo_${esc(nome)}.pdf</div><div class="nota">Leggibile da chiunque · contiene anche i dati per il gestionale</div></div></div>`:''}
+    ${S.logo&&SCELTA!=='pdf'?`<div class="file"><div class="s" style="background:var(--celadon-chiaro);color:var(--celadon)">LOGO</div><div><div class="n">logo_${esc(nome)}.png</div><div class="nota">Facoltativo</div></div></div>`:''}
   </div>
   <div class="nota">Se il file importabile non si apre o risulta danneggiato, l'app lo segnala e il riepilogo PDF basta per rifare il lavoro.</div>
   <div class="spazio"></div>
   ${bloccante()?'<div class="avviso err">Manca la ragione sociale: inseriscila nella Struttura.</div>':''}
   <button class="btn" data-act="share" ${bloccante()?'disabled':''}>Condividi (email, WhatsApp…)</button>
-  <div class="cols"><button class="btn sec" style="flex:1" data-act="salva-uno" data-v="json" ${bloccante()?'disabled':''}>Salva JSON</button><button class="btn sec" style="flex:1" data-act="salva-uno" data-v="pdf" ${bloccante()?'disabled':''}>Salva PDF</button></div>
-  ${S.logo?`<button class="btn sec" data-act="salva-uno" data-v="logo" ${bloccante()?'disabled':''}>Salva logo</button>`:''}
-  ${window.showDirectoryPicker?`<button class="btn sec" data-act="salva-tel" ${bloccante()?'disabled':''}>Salva tutto nella cartella</button>`:''}
-  ${ULTIMO?`<div class="nota">Se il download non è partito: <a style="color:var(--avorio-testo);font-weight:700" href="${ULTIMO.url}" download="${esc(ULTIMO.nome)}">tocca qui per scaricare ${esc(ULTIMO.nome)}</a></div>`:''}
+  <button class="btn sec" data-act="salva-scelta" ${bloccante()?'disabled':''}>Salva sul telefono</button>
+  ${PENDING.length?`<button class="btn" data-act="salva-pendente">Salva anche ${esc(PENDING[0].name)}</button>`:''}
+    ${ULTIMO?`<div class="nota">Se il download non è partito: <a style="color:var(--avorio-testo);font-weight:700" href="${ULTIMO.url}" download="${esc(ULTIMO.nome)}">tocca qui per scaricare ${esc(ULTIMO.nome)}</a></div>`:''}
   <div class="nota">Cartella: ${esc(cartellaNome()||'Download')}${window.showDirectoryPicker?'':' · per sceglierla ogni volta: Chrome → Impostazioni → Download → «Chiedi dove salvare i file»'}</div>
   ${window.showDirectoryPicker?'<button class="btn sec" style="min-height:44px;font-size:14px" data-act="cambia-cartella">Cambia cartella</button>':''}
   <div class="dopo"><b>Dopo l'invio</b><p>Elimina i file da chat e posta dopo l'importazione nell'app. Su WhatsApp usa i messaggi temporanei.</p><button class="btn peric" data-act="svuota">Svuota dati dal telefono</button></div>`;
@@ -458,7 +462,7 @@ const scollegaPers=p=>{const k=keyP(p);S.sedi.forEach(sd=>{sd.pers_rif=sd.pers_r
 function chiudiSede(){const sd=S.sedi[SIDX];if(sd&&!t(sd.nome)){S.sedi.splice(SIDX,1);SIDX=null;toast('Sede senza nome non salvata');}}
 function vai(v){VIEW=v;D=nuovaBozza(v);IDX=null;render();}
 function nuovaBozza(v){
-  if(v==='soggetti')return {ruolo:'',tipo:'giuridica',nome:'',indirizzo:'',mansione:'',credenziali:'',ambiti:'',cf:'',piva:'',categorie:[],mansioni:[]};
+  if(v==='soggetti')return {ruolo:'',tipo:'giuridica',nome:'',indirizzo:'',mansione:'',credenziali:'',ambiti:'',cf:'',piva:'',telefono:'',email:'',categorie:[],mansioni:[]};
   if(v==='personale'||v==='sede')return {cognome:'',nome:'',ruolo:'',mansioni:[],email:'',codice_fiscale:'',note:''};
   return {};
 }
@@ -510,17 +514,17 @@ function sediExp(){
 function costruisci(){
   const s=S.struttura,d=S.dpo;
   const sedi=sediExp();
+  const int=d.tipo==='interno';
   const dpo=d.presente
-    ?{attivo:true,origine:d.tipo,tipo:d.natura,nome:t(d.nome_denominazione),cf:d.tipo==='esterno'?t(d.codice_fiscale).toUpperCase():'',piva:d.tipo==='esterno'?t(d.partita_iva).replace(/\s/g,''):'',sede:d.tipo==='esterno'?t(d.sede):'',telefono:t(d.telefono),email:t(d.email)}
+    ?{attivo:true,origine:d.tipo,tipo:d.natura,nome:int?t(d.nome):t(d.nome_denominazione),...(int?{cognome:t(d.cognome)}:{}),cf:t(d.codice_fiscale).toUpperCase(),piva:int?'':t(d.partita_iva).replace(/\s/g,''),sede:int?'':t(d.sede),telefono:t(d.telefono),email:t(d.email)}
     :{attivo:false};
   return {
     schema:SCHEMA,versione:VERSIONE,creata_il:new Date().toISOString(),
     struttura:{titolare:t(s.ragione_sociale),piva:t(s.partita_iva).replace(/\s/g,''),indirizzo:t(s.indirizzo),cap:t(s.cap),comune:t(s.comune),provincia:t(s.provincia).toUpperCase(),telefono:t(s.telefono),email:t(s.email),pec:t(s.pec),profilo:s.profilo||'',data:dataIt(s.data_documenti||oggi()),logo:!!S.logo},
     dpo,
     soggetti:S.soggetti.map(x=>{
-      const o={ruolo:x.ruolo,tipo:x.tipo||'giuridica',nome:t(x.nome),cf:t(x.cf).toUpperCase(),piva:t(x.piva).replace(/\s/g,''),indirizzo:t(x.indirizzo),mansione:t(x.mansione)};
+      const o={ruolo:x.ruolo,tipo:x.tipo||'giuridica',nome:t(x.nome),cf:t(x.cf).toUpperCase(),piva:t(x.piva).replace(/\s/g,''),indirizzo:t(x.indirizzo),telefono:t(x.telefono),email:t(x.email),mansione:t(x.mansione),categorie:x.ruolo==='responsabile'?(x.categorie||[]).slice():[],mansioni:(x.mansioni||[]).slice()};
       if(SEZIONI_ACCESSO.includes(x.ruolo)){o.credenziali=x.credenziali||'';o.ambiti=t(x.ambiti);}
-      if(x.ruolo==='responsabile'){o.categorie=(x.categorie||[]).slice();if(o.categorie.includes('professionista_sanitario')&&(x.mansioni||[]).length)o.mansioni=x.mansioni.slice();}
       return o;
     }),
     personale:S.personale.map(persExp),
@@ -551,10 +555,13 @@ function daJson(o){
   sx.profilo=PROFILI.some(p=>p[0]===so.profilo)?so.profilo:'';
   sx.data_documenti=isoDa(so.data)||S.struttura.data_documenti||oggi();
   const d=o.dpo;
-  if(d&&d.attivo===true){Object.assign(st.dpo,{presente:true,tipo:d.origine==='interno'?'interno':'esterno',natura:d.tipo==='fisica'?'fisica':'giuridica',nome_denominazione:v(d.nome),codice_fiscale:v(d.cf),partita_iva:v(d.piva),sede:v(d.sede),telefono:v(d.telefono),email:v(d.email)});}
+  if(d&&d.attivo===true){
+    const int=d.origine==='interno';
+    Object.assign(st.dpo,{presente:true,tipo:int?'interno':'esterno',natura:d.tipo==='fisica'?'fisica':'giuridica',nome_denominazione:int?'':v(d.nome),cognome:int?(d.cognome?v(d.cognome):v(d.nome)):'',nome:int?(d.cognome?v(d.nome):''):'',codice_fiscale:v(d.cf),partita_iva:v(d.piva),sede:v(d.sede),telefono:v(d.telefono),email:v(d.email)});
+  }
   (Array.isArray(o.soggetti)?o.soggetti:[]).forEach(x=>{
     if(!x||!RUOLO_L[x.ruolo]||!t(v(x.nome))){ign.n++;return;}
-    st.soggetti.push({ruolo:x.ruolo,tipo:x.tipo==='fisica'?'fisica':'giuridica',nome:v(x.nome),indirizzo:v(x.indirizzo),mansione:v(x.mansione),credenziali:['fisse','occasionali'].includes(x.credenziali)?x.credenziali:'',ambiti:v(x.ambiti),cf:v(x.cf),piva:v(x.piva),categorie:(Array.isArray(x.categorie)?x.categorie:[]).filter(k=>CATEGORIA_L[k]),mansioni:(Array.isArray(x.mansioni)?x.mansioni:[]).filter(k=>MANSIONE_L[k])});
+    st.soggetti.push({ruolo:x.ruolo,tipo:x.tipo==='fisica'?'fisica':'giuridica',nome:v(x.nome),indirizzo:v(x.indirizzo),telefono:v(x.telefono),email:v(x.email),mansione:v(x.mansione),credenziali:['fisse','occasionali'].includes(x.credenziali)?x.credenziali:'',ambiti:v(x.ambiti),cf:v(x.cf),piva:v(x.piva),categorie:(Array.isArray(x.categorie)?x.categorie:[]).filter(k=>CATEGORIA_L[k]),mansioni:(Array.isArray(x.mansioni)?x.mansioni:[]).filter(k=>MANSIONE_L[k])});
   });
   const pers=x=>({cognome:v(x.nome),nome:'',ruolo:v(x.ruolo),mansioni:(Array.isArray(x.mansioni)?x.mansioni:[]).filter(k=>MANSIONE_L[k]),email:v(x.email),codice_fiscale:v(x.cf),note:v(x.note)});
   (Array.isArray(o.personale)?o.personale:[]).forEach(x=>{if(!x||!t(v(x.nome))){ign.n++;return;}st.personale.push(pers(x));});
@@ -605,16 +612,23 @@ async function sha256(txt){
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));
   return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
 }
-async function creaJson(){
+/* Un solo oggetto, due usi: file .json e PDF (campo Keywords) */
+async function creaFinale(){
   const o=costruisci();
   const h=await sha256(JSON.stringify(o));
   o.checksum=h?'sha256:'+h:null;
-  return JSON.stringify(o,null,2);
+  return {o,testo:JSON.stringify(o)};
 }
-function creaPdf(){
+async function creaJson(){return (await creaFinale()).testo;}
+function b64Utf8(txt){
+  const by=new TextEncoder().encode(txt);let bin='';
+  for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));
+  return btoa(bin);
+}
+function creaPdf(fin){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
-  const o=costruisci();
+  const o=fin.o;
   const M=18,W=210-2*M;let y=M;
   const salto=h=>{if(y+h>287){doc.addPage();y=M;}};
   const titolo=x=>{salto(14);y+=3;doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(11,31,74);doc.text(x,M,y);y+=2;doc.setDrawColor(255,90,18);doc.line(M,y,M+W,y);y+=5;};
@@ -627,9 +641,9 @@ function creaPdf(){
   riga('Telefono',s.telefono);riga('E-mail',s.email);riga('PEC',s.pec);riga('Profilo',(PROFILI.find(p=>p[0]===s.profilo)||['',''])[1]);riga('Data documenti',s.data);
   titolo('DPO');
   if(!o.dpo.attivo)riga('DPO','Non nominato');
-  else{const d=o.dpo;riga('Tipo',d.origine+' · '+d.tipo);riga('Nome o denominazione',d.nome);riga('Codice fiscale',d.cf);riga('Partita IVA',d.piva);riga('Sede',d.sede);riga('Telefono',d.telefono);riga('E-mail',d.email);}
+  else{const d=o.dpo;riga('Tipo',d.origine+' · '+d.tipo);riga('Nome o denominazione',[d.nome,d.cognome].filter(Boolean).join(' '));riga('Codice fiscale',d.cf);riga('Partita IVA',d.piva);riga('Sede',d.sede);riga('Telefono',d.telefono);riga('E-mail',d.email);}
   titolo('Soggetti ('+o.soggetti.length+')');
-  o.soggetti.forEach(x=>{riga(RUOLO_L[x.ruolo]||x.ruolo,x.nome+' ('+x.tipo+')');riga('  Indirizzo',x.indirizzo);riga('  Codice fiscale',x.cf);riga('  Partita IVA',x.piva);riga('  Mansione',x.mansione);riga('  Categorie',(x.categorie||[]).map(k=>CATEGORIA_L[k]).join(', '));riga('  Credenziali',x.credenziali);riga('  Ambiti',x.ambiti);y+=1.5;});
+  o.soggetti.forEach(x=>{riga(RUOLO_L[x.ruolo]||x.ruolo,x.nome+' ('+x.tipo+')');riga('  Indirizzo',x.indirizzo);riga('  Codice fiscale',x.cf);riga('  Partita IVA',x.piva);riga('  Telefono',x.telefono);riga('  E-mail',x.email);riga('  Mansione',x.mansione);riga('  Mansioni',(x.mansioni||[]).map(k=>MANSIONE_L[k]).join(', '));riga('  Categorie',(x.categorie||[]).map(k=>CATEGORIA_L[k]).join(', '));riga('  Credenziali',x.credenziali);riga('  Ambiti',x.ambiti);y+=1.5;});
   titolo('Personale ('+o.personale.length+')');
   o.personale.forEach(p=>{riga(p.nome,[p.ruolo,p.email,p.cf&&'CF '+p.cf,p.note].filter(Boolean).join(' · '));});
   titolo('Opzioni');
@@ -648,6 +662,10 @@ function creaPdf(){
       y+=1.5;
     });
   }
+  const b64=b64Utf8(fin.testo);
+  doc.setProperties({keywords:'GPJSON1:'+b64.length+':'+b64});
+  doc.setPage(doc.getNumberOfPages());doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(120,120,140);
+  doc.text('Contiene i dati completi per il gestionale (GPJSON1)',M,291);
   return doc.output('blob');
 }
 async function logoFile(){
@@ -657,27 +675,34 @@ async function logoFile(){
 }
 async function prepara(){
   const nome=base();
-  const json=new File([await creaJson()],`scheda_${nome}.json`,{type:'application/json'});
-  const pdf=new File([creaPdf()],`riepilogo_${nome}.pdf`,{type:'application/pdf'});
-  const files=[json,pdf];const lg=await logoFile();if(lg)files.push(lg);
-  return files;
+  const fin=await creaFinale();
+  const json=new File([fin.testo],`scheda_${nome}.json`,{type:'application/json'});
+  const pdf=new File([creaPdf(fin)],`riepilogo_${nome}.pdf`,{type:'application/pdf'});
+  return {json,pdf,logo:await logoFile()};
 }
-function scarica(files){files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*1500));}
+let SCELTA=(()=>{try{return localStorage.getItem('scheda_scelta')||'tutti';}catch(e){return 'tutti';}})();
+let PENDING=[];      // file ancora da scaricare (un tocco ciascuno)
+async function filesScelta(){
+  const p=await prepara(),l=[];
+  if(SCELTA!=='pdf')l.push(p.json);
+  if(SCELTA!=='json')l.push(p.pdf);
+  if(p.logo&&SCELTA!=='pdf')l.push(p.logo);
+  return l;
+}
 const trovaF=(fs,pre)=>fs.find(f=>f.name.startsWith(pre));
 async function condividi(){
   try{
-    const files=await prepara();
+    const files=await filesScelta();
     /* Chrome su Android rifiuta i file JSON nel menu Condividi ("Permission denied"): si invia come testo .json.txt */
-    const jf=trovaF(files,'scheda_');
     const da=/Android/i.test(navigator.userAgent);
-    const lista=da?files.map(f=>f===jf?new File([f],f.name+'.txt',{type:'text/plain'}):f):files;
+    const lista=da?files.map(f=>f.name.startsWith('scheda_')?new File([f],f.name+'.txt',{type:'text/plain'}):f):files;
     if(navigator.canShare&&navigator.canShare({files:lista})){
       await navigator.share({files:lista,title:'Scheda cliente',text:'Scheda cliente'});
-      if(da)toast('JSON inviato come .json.txt: il contenuto è identico',5000);
-    }else{toast('Condivisione non disponibile: usa Salva JSON e Salva PDF',5000);}
+      if(da&&files.some(f=>f.name.startsWith('scheda_')))toast('JSON inviato come .json.txt: il contenuto è identico',5000);
+    }else{toast('Condivisione non disponibile: usa Salva sul telefono',5000);}
   }catch(e){
     if(e&&e.name==='AbortError')return;
-    toast('Condivisione non riuscita ('+(e.message||e)+'). Usa Salva JSON e Salva PDF.',6000);
+    toast('Condivisione non riuscita ('+(e.message||e)+'). Usa Salva sul telefono.',6000);
   }
 }
 let ULTIMO=null;     // ultimo file preparato per il download (link di riserva)
@@ -685,18 +710,6 @@ function scaricaUno(f){
   if(ULTIMO)URL.revokeObjectURL(ULTIMO.url);
   ULTIMO={nome:f.name,url:URL.createObjectURL(f)};
   const a=document.createElement('a');a.href=ULTIMO.url;a.download=f.name;document.body.appendChild(a);a.click();a.remove();
-}
-async function salvaUno(tipo){
-  try{
-    let dir=null;
-    try{dir=await cartella(false);}catch(e){if(e&&e.name==='AbortError')return;dir=null;}
-    const files=await prepara();
-    const f=tipo==='json'?trovaF(files,'scheda_'):tipo==='pdf'?trovaF(files,'riepilogo_'):trovaF(files,'logo_');
-    if(!f){toast('File non disponibile');return;}
-    if(dir){const fh=await dir.getFileHandle(f.name,{create:true});const w=await fh.createWritable();await w.write(f);await w.close();toast('Salvato '+f.name+' in «'+dir.name+'»',5000);}
-    else{scaricaUno(f);toast('Download avviato: '+f.name+'. Se non compare, tocca il link in basso.',6000);}
-    render(true);
-  }catch(e){toast('Errore: '+(e.message||e));}
 }
 /* Salva sul telefono: cartella scelta (se il browser lo permette) oppure Download */
 const cartellaNome=()=>{try{return localStorage.getItem('scheda_cartella')||'';}catch(e){return '';}};
@@ -710,13 +723,19 @@ async function cartella(forza){
   if(!h){h=await window.showDirectoryPicker({mode:'readwrite'});await idbSet('dir',h).catch(()=>{});try{localStorage.setItem('scheda_cartella',h.name);}catch(e){}}
   return h;
 }
-async function salvaTelefono(){
+async function salvaScelta(){
   try{
     let dir=null;
     try{dir=await cartella(false);}catch(e){if(e&&e.name==='AbortError')return;dir=null;}
-    const files=await prepara();
-    if(dir){for(const f of files){const fh=await dir.getFileHandle(f.name,{create:true});const w=await fh.createWritable();await w.write(f);await w.close();}toast('Salvati nella cartella «'+dir.name+'»');}
-    else{scarica(files);toast('Salvati nella cartella Download');}
+    const files=await filesScelta();
+    if(dir){
+      for(const f of files){const fh=await dir.getFileHandle(f.name,{create:true});const w=await fh.createWritable();await w.write(f);await w.close();}
+      PENDING=[];toast('Salvati '+files.length+(files.length===1?' file':' file')+' in «'+dir.name+'»',5000);
+    }else{
+      PENDING=files.slice(1);scaricaUno(files[0]);
+      toast('Download avviato: '+files[0].name+(PENDING.length?'. Poi tocca «Salva anche…»':'. Se non compare, tocca il link in basso.'),6000);
+    }
+    render(true);
   }catch(e){toast('Errore: '+(e.message||e));}
 }
 function riduciLogo(file){
@@ -758,8 +777,9 @@ document.addEventListener('click',async e=>{
   else if(a==='dpo-rimuovi'){if(confirm('Rimuovere il DPO e cancellarne i dati?')){S.dpo=vuota().dpo;salva();render(true);toast('DPO rimosso');}}
   else if(a==='del-sogg-l'){if(confirm('Eliminare questo soggetto?')){S.soggetti.splice(i,1);salva();D=nuovaBozza('soggetti');IDX=null;render(true);}}
   else if(a==='del-pers-l'){if(confirm('Eliminare questa persona?')){scollegaPers(S.personale[i]);S.personale.splice(i,1);salva();D=nuovaBozza('personale');IDX=null;render(true);}}
-  else if(a==='salva-tel'){salva();salvaTelefono();}
-  else if(a==='salva-uno'){salva();salvaUno(v);}
+  else if(a==='salva-scelta'){salva();salvaScelta();}
+  else if(a==='salva-pendente'){const f=PENDING.shift();if(f){scaricaUno(f);toast('Download avviato: '+f.name,5000);}render(true);}
+  else if(a==='scelta-file'){SCELTA=v;PENDING=[];try{localStorage.setItem('scheda_scelta',v);}catch(e){}render(true);}
   else if(a==='cambia-cartella'){try{await cartella(true);render(true);}catch(e){if(e&&e.name!=='AbortError')toast('Selezione cartella non disponibile');}}
   else if(a==='conferma-opz'){S.opzioni_confermate=true;salva();vai('home');}
   else if(a==='logo-del'){S.logo=null;salva();render();}
@@ -783,7 +803,7 @@ document.addEventListener('click',async e=>{
   else if(a==='svuota'){if(confirm('Cancellare dal telefono TUTTI i dati di questa scheda? Assicurati di averla già inviata.')){localStorage.removeItem(KEY);S=vuota();D={};IDX=null;VIEW='home';render();toast('Dati cancellati da questo telefono');}}
 });
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
-window.__test={get S(){return S;},set S(x){S=x;},apriFile,daJson,costruisci,creaJson,creaPdf,render,vai,controlli};
+window.__test={get S(){return S;},set S(x){S=x;},apriFile,daJson,costruisci,creaFinale,creaJson,creaPdf,render,vai,controlli};
 render();
 </script>
 </body>
